@@ -28,12 +28,12 @@ class WiresharkMonitor:
         """Wireshark 캡처 시작"""
         print(f"Wireshark 캡처 시작: {self.capture_file}")
         
-        # tshark를 사용한 백그라운드 캡처
+        # tshark를 사용한 백그라운드 캡처 (실제로는 36412 포트만 사용)
         cmd = [
             "tshark",
             "-i", self.interface,
             "-w", self.capture_file,
-            "-f", "udp port 36412 or udp port 36422 or udp port 36432"
+            "-f", "udp port 36412"
         ]
         
         print(f"실행 명령어: {' '.join(cmd)}")
@@ -94,11 +94,11 @@ class WiresharkMonitor:
             result = subprocess.run(rrc_cmd, capture_output=True, text=True)
             self.stats["rrc_requests"] = len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
             
-            # Paging 메시지 분석
+            # Paging 메시지 분석 (실제로는 36412 포트 사용)
             paging_cmd = [
                 "tshark",
                 "-r", self.capture_file,
-                "-Y", "udp.port == 36422",
+                "-Y", "udp.port == 36412 and udp contains 0x0002",
                 "-T", "fields",
                 "-e", "frame.number"
             ]
@@ -106,11 +106,11 @@ class WiresharkMonitor:
             result = subprocess.run(paging_cmd, capture_output=True, text=True)
             self.stats["paging_messages"] = len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
             
-            # NAS 메시지 분석
+            # NAS 메시지 분석 (실제로는 36412 포트 사용)
             nas_cmd = [
                 "tshark",
                 "-r", self.capture_file,
-                "-Y", "udp.port == 36432",
+                "-Y", "udp.port == 36412 and (udp contains 0x41 or udp contains 0x48 or udp contains 0x45)",
                 "-T", "fields",
                 "-e", "frame.number"
             ]
@@ -118,10 +118,11 @@ class WiresharkMonitor:
             result = subprocess.run(nas_cmd, capture_output=True, text=True)
             self.stats["nas_messages"] = len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
             
-            # 전체 패킷 수
+            # 전체 패킷 수 (LTE 관련 포트만)
             total_cmd = [
                 "tshark",
                 "-r", self.capture_file,
+                "-Y", "udp.port == 36412",
                 "-T", "fields",
                 "-e", "frame.number"
             ]
