@@ -36,6 +36,8 @@ class WiresharkMonitor:
             "-f", "udp port 36412 or udp port 36422 or udp port 36432"
         ]
         
+        print(f"실행 명령어: {' '.join(cmd)}")
+        
         try:
             self.capture_process = subprocess.Popen(
                 cmd,
@@ -45,6 +47,15 @@ class WiresharkMonitor:
             self.monitoring = True
             self.stats["start_time"] = datetime.now()
             print("캡처 프로세스 시작됨")
+            
+            # 프로세스 상태 확인
+            if self.capture_process.poll() is None:
+                print("✅ tshark 프로세스가 정상적으로 실행 중입니다")
+            else:
+                print("❌ tshark 프로세스가 즉시 종료되었습니다")
+                stderr_output = self.capture_process.stderr.read().decode()
+                print(f"오류 메시지: {stderr_output}")
+                
         except Exception as e:
             print(f"캡처 시작 오류: {e}")
     
@@ -60,6 +71,15 @@ class WiresharkMonitor:
         """캡처된 파일 분석"""
         if not self.monitoring:
             return
+        
+        # 캡처 파일 존재 여부 확인
+        import os
+        if not os.path.exists(self.capture_file):
+            print(f"⚠️  캡처 파일이 아직 생성되지 않았습니다: {self.capture_file}")
+            return
+        
+        file_size = os.path.getsize(self.capture_file)
+        print(f"📁 캡처 파일 크기: {file_size} bytes")
         
         try:
             # RRC Connection Request 분석
