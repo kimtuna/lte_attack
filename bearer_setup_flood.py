@@ -20,7 +20,7 @@ class BearerSetupFlood:
         
     def generate_ue_id(self):
         """임의의 UE ID 생성"""
-        return random.randint(1, 1000000)
+        return random.randint(1, 4294967295)  # 32비트 unsigned int 범위
     
     def generate_bearer_id(self):
         """임의의 Bearer ID 생성"""

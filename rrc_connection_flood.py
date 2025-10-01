@@ -23,7 +23,7 @@ class RRCConnectionFlood:
         
     def generate_ue_identity(self):
         """임의의 UE 식별자 생성"""
-        return random.randint(100000000000000, 999999999999999)
+        return random.randint(1, 4294967295)  # 32비트 unsigned int 범위
     
     def create_rrc_connection_request(self, ue_id):
         """RRC Connection Request 메시지 생성"""

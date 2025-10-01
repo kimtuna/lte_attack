@@ -21,7 +21,7 @@ class PagingStormAttack:
         
     def generate_imsi(self):
         """임의의 IMSI 생성"""
-        return random.randint(100000000000000, 999999999999999)
+        return random.randint(100000000000000, 999999999999999)  # IMSI는 15자리
     
     def create_paging_message(self, imsi):
         """Paging 메시지 생성"""
