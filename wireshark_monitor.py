@@ -118,6 +118,18 @@ class WiresharkMonitor:
             result = subprocess.run(nas_cmd, capture_output=True, text=True)
             self.stats["nas_messages"] = len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
             
+            # Bearer 요청 분석 (실제로는 36412 포트 사용)
+            bearer_cmd = [
+                "tshark",
+                "-r", self.capture_file,
+                "-Y", "udp.port == 36412 and (udp contains 0x0003 or udp contains 0x0004)",
+                "-T", "fields",
+                "-e", "frame.number"
+            ]
+            
+            result = subprocess.run(bearer_cmd, capture_output=True, text=True)
+            self.stats["bearer_requests"] = len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
+            
             # 전체 패킷 수 (LTE 관련 포트만)
             total_cmd = [
                 "tshark",
