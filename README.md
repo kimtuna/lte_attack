@@ -19,10 +19,6 @@ srsRAN LTE 테스트 환경에서 Resource Depletion DoS 공격을 테스트하�
 - **방법**: 300개 UE가 Attach/TAU/Detach 요청을 랜덤하게 전송
 - **영향**: MME의 시그널링 처리 능력 초과
 
-### 4. Bearer Setup Flood (`bearer_setup_flood.py`)
-- **목적**: Bearer 설정 요청으로 네트워크 리소스 고갈
-- **방법**: 200개 UE가 Bearer Setup/Modify 요청을 전송
-- **영향**: 네트워크의 Bearer 관리 리소스 고갈
 
 ## 사용 방법
 
