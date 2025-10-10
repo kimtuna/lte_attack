@@ -11,6 +11,7 @@ import random
 import subprocess
 import os
 import re
+import struct
 from datetime import datetime
 
 class RealUEFlood:
