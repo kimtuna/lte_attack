@@ -57,8 +57,8 @@ class SimpleUESimulator:
         # 측정값 포함
         for cell_id in range(5):  # 5개 셀 측정값
             message += struct.pack('>H', cell_id)  # Cell ID
-            message += struct.pack('>B', random.randint(-120, -50))  # RSRP
-            message += struct.pack('>B', random.randint(-20, 0))  # RSRQ
+            message += struct.pack('>B', random.randint(50, 120))  # RSRP (양수로 변경)
+            message += struct.pack('>B', random.randint(0, 20))  # RSRQ (양수로 변경)
             message += struct.pack('>B', random.randint(0, 100))  # SINR
         
         return message
