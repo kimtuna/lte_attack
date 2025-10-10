@@ -56,9 +56,9 @@ class RRCZeroMQTester:
     def monitor_responses(self):
         """응답 메시지 모니터링"""
         try:
-            # PULL 소켓으로 응답 수신 (포트 2001에서 LISTEN)
+            # PULL 소켓으로 응답 수신 (다른 포트 사용)
             rx_socket = self.context.socket(zmq.PULL)
-            rx_socket.bind(f"tcp://*:{self.rx_port}")  # 포트 2001에서 응답 대기
+            rx_socket.bind(f"tcp://*:{self.rx_port + 100}")  # 포트 충돌 방지
             
             print(f"응답 모니터링 시작 (포트 {self.rx_port})")
             
