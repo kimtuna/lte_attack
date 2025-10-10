@@ -12,7 +12,7 @@ import threading
 from datetime import datetime
 
 class SimpleUESimulator:
-    def __init__(self, enb_port=2001):
+    def __init__(self, enb_port=2005):
         self.enb_port = enb_port
         self.context = zmq.Context()
         self.running = False

