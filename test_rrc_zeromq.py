@@ -36,9 +36,9 @@ class RRCZeroMQTester:
     def send_rrc_message(self, message, message_type="Unknown"):
         """RRC 메시지 전송"""
         try:
-            # PUSH 소켓으로 메시지 전송
+            # PUSH 소켓으로 메시지 전송 (포트 2000으로 CONNECT)
             tx_socket = self.context.socket(zmq.PUSH)
-            tx_socket.connect(f"tcp://localhost:{self.tx_port}")
+            tx_socket.connect(f"tcp://localhost:{self.tx_port}")  # 포트 2000으로 연결
             
             print(f"[{datetime.now().strftime('%H:%M:%S')}] {message_type} 전송")
             print(f"  메시지 크기: {len(message)} bytes")
@@ -56,9 +56,9 @@ class RRCZeroMQTester:
     def monitor_responses(self):
         """응답 메시지 모니터링"""
         try:
-            # PULL 소켓으로 응답 수신
+            # PULL 소켓으로 응답 수신 (포트 2001에서 LISTEN)
             rx_socket = self.context.socket(zmq.PULL)
-            rx_socket.bind(f"tcp://*:{self.rx_port}")
+            rx_socket.bind(f"tcp://*:{self.rx_port}")  # 포트 2001에서 응답 대기
             
             print(f"응답 모니터링 시작 (포트 {self.rx_port})")
             
