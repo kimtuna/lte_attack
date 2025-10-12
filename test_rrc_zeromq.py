@@ -11,7 +11,7 @@ import threading
 from datetime import datetime
 
 class RRCZeroMQTester:
-    def __init__(self, tx_port=2001, rx_port=2000):
+    def __init__(self, tx_port=2000, rx_port=2001):
         self.tx_port = tx_port
         self.rx_port = rx_port
         self.context = zmq.Context()
@@ -139,8 +139,8 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='RRC ZeroMQ 테스트')
-    parser.add_argument('--tx-port', type=int, default=2001, help='TX 포트')
-    parser.add_argument('--rx-port', type=int, default=2000, help='RX 포트')
+    parser.add_argument('--tx-port', type=int, default=2000, help='TX 포트')
+    parser.add_argument('--rx-port', type=int, default=2001, help='RX 포트')
     parser.add_argument('--duration', type=int, default=60, help='테스트 지속 시간 (초)')
     
     args = parser.parse_args()
