@@ -78,7 +78,7 @@ class RealUERRCCapture:
         ]
         
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            result = subprocess.run(["sudo"] + cmd, capture_output=True, text=True, check=True)
             lines = result.stdout.strip().split('\n')
             
             if not lines or not lines[0]:
