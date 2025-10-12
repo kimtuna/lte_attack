@@ -358,26 +358,10 @@ class RealUEAttack:
         print(f"=== 물리 계층 연결 시뮬레이션 시작 ===")
         
         try:
-            # srsRAN UE 설정 파일 생성 (최소 설정)
+            # srsRAN UE 설정 파일 생성 (빈 설정 파일)
             ue_config = """
-[rf]
-device_name = zmq
-device_args = tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue
-
-[rat.eutra]
-dl_earfcn = 2680
-ul_earfcn = 25680
-
-[nas]
-apn = internet
-force_imsi_attach = true
-imsi = 001010123456789
-
-[usim]
-algo = milenage
-op = 63BFA50EE9864AAB33CC72DD78524B98
-k = 00112233445566778899AABBCCDDEEFF
-imsi = 001010123456789
+# srsRAN UE 설정 파일
+# 모든 설정은 명령행 옵션으로 전달
 """
             
             # 설정 파일 저장
@@ -1433,26 +1417,10 @@ gtp_bind_port = 2123
         print(f"=== srsRAN UE 연결 과정 분석 ===")
         
         try:
-            # 실제 srsRAN UE 실행 및 로그 캡처 (최소 설정)
+            # 실제 srsRAN UE 실행 및 로그 캡처 (빈 설정 파일)
             ue_config = """
-[rf]
-device_name = zmq
-device_args = tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue
-
-[rat.eutra]
-dl_earfcn = 2680
-ul_earfcn = 25680
-
-[nas]
-apn = internet
-force_imsi_attach = true
-imsi = 001010123456789
-
-[usim]
-algo = milenage
-op = 63BFA50EE9864AAB33CC72DD78524B98
-k = 00112233445566778899AABBCCDDEEFF
-imsi = 001010123456789
+# srsRAN UE 설정 파일
+# 모든 설정은 명령행 옵션으로 전달
 """
             
             # 설정 파일 저장
@@ -1460,9 +1428,9 @@ imsi = 001010123456789
             with open(config_file, 'w') as f:
                 f.write(ue_config)
             
-            # srsRAN UE 프로세스 시작 (설정 파일 사용)
+            # srsRAN UE 프로세스 시작 (상세 로그 포함)
             cmd = [
-                "sudo", "srsue", "-v",
+                "sudo", "srsue",
                 "--rf.device_name=zmq",
                 "--rf.device_args=tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue",
                 "--rat.eutra.dl_earfcn=2680",
@@ -1473,6 +1441,11 @@ imsi = 001010123456789
                 "--usim.op=63BFA50EE9864AAB33CC72DD78524B98",
                 "--usim.k=00112233445566778899AABBCCDDEEFF",
                 "--usim.imsi=001010123456789",
+                "--log.all_level=debug",
+                "--log.rf_level=debug",
+                "--log.phy_level=debug",
+                "--log.rrc_level=debug",
+                "--log.nas_level=debug",
                 config_file
             ]
             
