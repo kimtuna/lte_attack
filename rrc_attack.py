@@ -370,7 +370,7 @@ class RealUEAttack:
             ue_config = """
 [rf]
 device_name = zmq
-device_args = tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000,id=ue
+device_args = tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue
 tx_gain = 76
 rx_gain = 76
 
@@ -505,7 +505,7 @@ op = 63BFA50EE9864AAB33CC72DD78524B98
             enb_config = """
 [rf]
 device_name = zmq
-device_args = tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001
+device_args = tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000
 tx_gain = 76
 rx_gain = 76
 freq = 2680000000
@@ -1450,7 +1450,7 @@ gtp_bind_port = 2123
             ue_config = """
 [rf]
 device_name = zmq
-device_args = tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000,id=ue
+device_args = tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue
 tx_gain = 76
 rx_gain = 76
 
