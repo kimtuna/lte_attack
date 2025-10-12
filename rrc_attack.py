@@ -358,10 +358,30 @@ class RealUEAttack:
         print(f"=== 물리 계층 연결 시뮬레이션 시작 ===")
         
         try:
-            # srsRAN UE 설정 파일 생성 (빈 설정 파일)
+            # 기존 srsue 프로세스 종료
+            print("기존 srsue 프로세스 종료 중...")
+            try:
+                subprocess.run(["sudo", "pkill", "-f", "srsue"], check=False)
+                time.sleep(2)  # 프로세스 종료 대기
+            except:
+                pass
+            
+            # srsRAN UE 설정 파일 생성 (명시적 포트 설정)
             ue_config = """
-# srsRAN UE 설정 파일
-# 모든 설정은 명령행 옵션으로 전달
+[rf]
+device_name = zmq
+device_args = tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000,id=ue
+tx_gain = 76
+rx_gain = 76
+freq = 2680000000
+
+[rat.eutra]
+dl_earfcn = 2680
+
+[usim]
+imsi = 001010123456789
+k = 00112233445566778899AABBCCDDEEFF
+op = 63BFA50EE9864AAB33CC72DD78524B98
 """
             
             # 설정 파일 저장
@@ -369,15 +389,9 @@ class RealUEAttack:
             with open(config_file, 'w') as f:
                 f.write(ue_config)
             
-            # srsRAN UE 프로세스 시작 (최소 옵션만)
+            # srsRAN UE 프로세스 시작 (설정 파일만 사용)
             cmd = [
                 "sudo", "srsue",
-                "--rf.device_name=zmq",
-                "--rf.device_args=tx_port=tcp://localhost:2002,rx_port=tcp://localhost:2003,id=ue",
-                "--rat.eutra.dl_earfcn=2680",
-                "--usim.imsi=001010123456789",
-                "--usim.k=00112233445566778899AABBCCDDEEFF",
-                "--usim.op=63BFA50EE9864AAB33CC72DD78524B98",
                 config_file
             ]
             
@@ -1425,10 +1439,34 @@ gtp_bind_port = 2123
         print(f"=== srsRAN UE 연결 과정 분석 ===")
         
         try:
-            # 실제 srsRAN UE 실행 및 로그 캡처 (빈 설정 파일)
+            # 기존 srsue 프로세스 종료
+            print("기존 srsue 프로세스 종료 중...")
+            try:
+                subprocess.run(["sudo", "pkill", "-f", "srsue"], check=False)
+                time.sleep(2)  # 프로세스 종료 대기
+            except:
+                pass
+            
+            # 실제 srsRAN UE 실행 및 로그 캡처 (명시적 포트 설정)
             ue_config = """
-# srsRAN UE 설정 파일
-# 모든 설정은 명령행 옵션으로 전달
+[rf]
+device_name = zmq
+device_args = tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000,id=ue
+tx_gain = 76
+rx_gain = 76
+freq = 2680000000
+
+[rat.eutra]
+dl_earfcn = 2680
+
+[usim]
+imsi = 001010123456789
+k = 00112233445566778899AABBCCDDEEFF
+op = 63BFA50EE9864AAB33CC72DD78524B98
+
+[log]
+all_level = debug
+file_enable = true
 """
             
             # 설정 파일 저장
@@ -1436,17 +1474,9 @@ gtp_bind_port = 2123
             with open(config_file, 'w') as f:
                 f.write(ue_config)
             
-            # srsRAN UE 프로세스 시작 (최소 옵션 + 상세 로그)
+            # srsRAN UE 프로세스 시작 (설정 파일만 사용)
             cmd = [
                 "sudo", "srsue",
-                "--rf.device_name=zmq",
-                "--rf.device_args=tx_port=tcp://localhost:2002,rx_port=tcp://localhost:2003,id=ue",
-                "--rat.eutra.dl_earfcn=2680",
-                "--usim.imsi=001010123456789",
-                "--usim.k=00112233445566778899AABBCCDDEEFF",
-                "--usim.op=63BFA50EE9864AAB33CC72DD78524B98",
-                "--log.all_level=debug",
-                "--log.rf_level=debug",
                 config_file
             ]
             
