@@ -1464,7 +1464,6 @@ op = 63BFA50EE9864AAB33CC72DD78524B98
 
 [log]
 all_level = debug
-file_enable = true
 """
             
             # 설정 파일 저장
