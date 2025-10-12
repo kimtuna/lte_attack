@@ -1370,14 +1370,22 @@ gtp_bind_port = 2123
         # UE 프로세스가 이미 종료되었는지 확인
         if ue_process.poll() is not None:
             print("UE 프로세스가 즉시 종료됨")
+            # UE 프로세스 종료
+            try:
+                ue_process.terminate()
+                ue_process.wait(timeout=5)
+                print("UE 프로세스 종료됨")
+            except:
+                ue_process.kill()
+                print("UE 프로세스 강제 종료됨")
             return False
         
-        # 3. 연결 상태 모니터링
-        print(f"3. 연결 상태 모니터링 (30초)...")
+        # 3. 연결 상태 모니터링 (5초로 단축)
+        print(f"3. 연결 상태 모니터링 (5초)...")
         start_time = time.time()
         connection_success = False
         
-        while (time.time() - start_time) < 30:
+        while (time.time() - start_time) < 5:  # 5초로 단축
             # UE 프로세스 상태 확인
             if ue_process.poll() is not None:
                 print("UE 프로세스가 종료됨")
@@ -1398,7 +1406,7 @@ gtp_bind_port = 2123
             except Exception as e:
                 print(f"메시지 전송 실패: {e}")
             
-            time.sleep(1)
+            time.sleep(0.5)  # 0.5초 간격으로 단축
         
         # 4. UE 프로세스 종료
         try:
@@ -1451,44 +1459,61 @@ gtp_bind_port = 2123
             # 연결 과정 로그 수집
             connection_logs = []
             start_time = time.time()
+            last_output_time = start_time
             
             while (time.time() - start_time) < 60:  # 60초 동안 모니터링
-                # stdout과 stderr 모두 읽기
-                line = process.stdout.readline()
-                if line:
-                    timestamp = datetime.now().strftime('%H:%M:%S')
-                    log_entry = f"[{timestamp}] STDOUT: {line.strip()}"
-                    connection_logs.append(log_entry)
-                    print(log_entry)
-                    
-                    # 연결 성공 신호 확인
-                    if "RRC Connected" in line or "Attach successful" in line:
-                        print("✓ 연결 성공!")
-                        break
-                
-                # stderr도 확인
-                stderr_line = process.stderr.readline()
-                if stderr_line:
-                    timestamp = datetime.now().strftime('%H:%M:%S')
-                    log_entry = f"[{timestamp}] STDERR: {stderr_line.strip()}"
-                    connection_logs.append(log_entry)
-                    print(log_entry)
-                
+                # 프로세스 상태 먼저 확인
                 if process.poll() is not None:
                     print("UE 프로세스 종료됨")
                     # 종료 전 남은 출력 읽기
-                    remaining_stdout = process.stdout.read()
-                    remaining_stderr = process.stderr.read()
-                    if remaining_stdout:
+                    try:
+                        remaining_stdout = process.stdout.read()
+                        remaining_stderr = process.stderr.read()
+                        if remaining_stdout:
+                            timestamp = datetime.now().strftime('%H:%M:%S')
+                            log_entry = f"[{timestamp}] STDOUT_REMAINING: {remaining_stdout.strip()}"
+                            connection_logs.append(log_entry)
+                            print(log_entry)
+                        if remaining_stderr:
+                            timestamp = datetime.now().strftime('%H:%M:%S')
+                            log_entry = f"[{timestamp}] STDERR_REMAINING: {remaining_stderr.strip()}"
+                            connection_logs.append(log_entry)
+                            print(log_entry)
+                    except:
+                        pass
+                    break
+                
+                # stdout과 stderr 모두 읽기 (논블로킹)
+                try:
+                    # stdout 읽기
+                    line = process.stdout.readline()
+                    if line:
                         timestamp = datetime.now().strftime('%H:%M:%S')
-                        log_entry = f"[{timestamp}] STDOUT_REMAINING: {remaining_stdout.strip()}"
+                        log_entry = f"[{timestamp}] STDOUT: {line.strip()}"
                         connection_logs.append(log_entry)
                         print(log_entry)
-                    if remaining_stderr:
+                        last_output_time = time.time()  # 출력 시간 업데이트
+                        
+                        # 연결 성공 신호 확인
+                        if "RRC Connected" in line or "Attach successful" in line:
+                            print("✓ 연결 성공!")
+                            break
+                    
+                    # stderr 읽기
+                    stderr_line = process.stderr.readline()
+                    if stderr_line:
                         timestamp = datetime.now().strftime('%H:%M:%S')
-                        log_entry = f"[{timestamp}] STDERR_REMAINING: {remaining_stderr.strip()}"
+                        log_entry = f"[{timestamp}] STDERR: {stderr_line.strip()}"
                         connection_logs.append(log_entry)
                         print(log_entry)
+                        last_output_time = time.time()  # 출력 시간 업데이트
+                        
+                except Exception as e:
+                    print(f"출력 읽기 오류: {e}")
+                
+                # 10초간 출력이 없으면 타임아웃
+                if (time.time() - last_output_time) > 10:
+                    print("10초간 출력이 없어 타임아웃됨")
                     break
                 
                 time.sleep(0.1)
