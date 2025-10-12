@@ -22,7 +22,7 @@ class RealUERRCCapture:
     def capture_ue_packets(self):
         """실제 UE 패킷 캡처"""
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        capture_file = f"{self.log_dir}/ue_rrc_capture_{timestamp}.pcap"
+        capture_file = f"/tmp/ue_rrc_capture_{timestamp}.pcap"
         
         print(f"=== 실제 UE RRC 메시지 캡처 시작 ===")
         print(f"캡처 시간: {self.duration}초")
