@@ -102,25 +102,18 @@ class RealUERRCCapture:
                         print(f"  크기: {tcp_len} bytes")
                         print(f"  데이터: {data}")
                         
-                        # RRC 메시지 타입 추출 (데이터가 있는 경우)
-                        if data and len(data) >= 4:
-                            try:
-                                # 첫 2바이트에서 메시지 타입 추출
-                                msg_type = int(data[:4], 16)
-                                print(f"  메시지 타입: 0x{msg_type:04X}")
-                                
-                                # 메시지 저장
-                                self.captured_packets.append({
-                                    'timestamp': timestamp,
-                                    'direction': direction,
-                                    'src_port': src_port,
-                                    'dst_port': dst_port,
-                                    'size': tcp_len,
-                                    'data': data,
-                                    'message_type': f"0x{msg_type:04X}"
-                                })
-                            except ValueError:
-                                print(f"  메시지 타입 파싱 실패")
+                        # 전체 메시지 저장 (데이터가 있는 경우)
+                        if data and len(data) > 0:
+                            # 전체 메시지를 그대로 저장
+                            self.captured_packets.append({
+                                'timestamp': timestamp,
+                                'direction': direction,
+                                'src_port': src_port,
+                                'dst_port': dst_port,
+                                'size': tcp_len,
+                                'data': data,
+                                'message_hex': data
+                            })
             
             return True
             
@@ -144,17 +137,17 @@ class RealUERRCCapture:
         print(f"파일: {output_file}")
         print(f"총 {len(self.captured_packets)}개 RRC 메시지 분석됨")
         
-        # 메시지 타입별 통계
-        message_types = {}
+        # 메시지 크기별 통계
+        message_sizes = {}
         for packet in self.captured_packets:
-            msg_type = packet['message_type']
-            if msg_type not in message_types:
-                message_types[msg_type] = 0
-            message_types[msg_type] += 1
+            size = packet['size']
+            if size not in message_sizes:
+                message_sizes[size] = 0
+            message_sizes[size] += 1
         
-        print("\n=== 메시지 타입별 통계 ===")
-        for msg_type, count in message_types.items():
-            print(f"  {msg_type}: {count}개")
+        print("\n=== 메시지 크기별 통계 ===")
+        for size, count in sorted(message_sizes.items()):
+            print(f"  {size} bytes: {count}개")
     
     def generate_attack_packets(self):
         """분석된 패킷을 기반으로 공격용 패킷 생성"""
@@ -164,22 +157,37 @@ class RealUERRCCapture:
         
         print(f"\n=== 공격용 패킷 생성 ===")
         
-        # 가장 많이 사용된 메시지 타입 찾기
-        message_types = {}
-        for packet in self.captured_packets:
-            msg_type = packet['message_type']
-            if msg_type not in message_types:
-                message_types[msg_type] = []
-            message_types[msg_type].append(packet)
+        # UE→eNB 방향의 메시지만 필터링
+        ue_to_enb_packets = [p for p in self.captured_packets if p['direction'] == 'UE→eNB']
         
-        # 가장 많이 사용된 메시지 타입
-        most_common_type = max(message_types.keys(), key=lambda k: len(message_types[k]))
-        print(f"가장 많이 사용된 메시지 타입: {most_common_type}")
+        if not ue_to_enb_packets:
+            print("UE→eNB 방향의 메시지가 없습니다.")
+            return
         
-        # 해당 메시지 타입의 패킷들 출력
-        print(f"\n{most_common_type} 메시지 예시:")
-        for i, packet in enumerate(message_types[most_common_type][:3]):  # 최대 3개만
+        print(f"UE→eNB 메시지 {len(ue_to_enb_packets)}개 발견")
+        
+        # 실제 메시지 예시 출력
+        print(f"\n실제 UE 메시지 예시:")
+        for i, packet in enumerate(ue_to_enb_packets[:5]):  # 최대 5개만
             print(f"  예시 {i+1}: {packet['data']}")
+        
+        # 공격용 패킷 파일 생성
+        self.save_attack_packets(ue_to_enb_packets)
+    
+    def save_attack_packets(self, packets):
+        """공격용 패킷을 파일로 저장"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        attack_file = f"{self.log_dir}/attack_packets_{timestamp}.txt"
+        
+        with open(attack_file, 'w') as f:
+            f.write("# 실제 UE RRC 메시지 (공격용)\n")
+            f.write("# 포맷: hex_data\n\n")
+            
+            for packet in packets:
+                f.write(f"{packet['data']}\n")
+        
+        print(f"\n공격용 패킷 저장: {attack_file}")
+        print(f"총 {len(packets)}개 메시지 저장됨")
     
     def run(self):
         """전체 프로세스 실행"""
