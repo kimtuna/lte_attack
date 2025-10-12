@@ -97,39 +97,39 @@ class PacketAnalyzer:
         print("기본 RRC 메시지 패킷 생성 중...")
         
         # RRC Connection Request
-        rrc_request = struct.pack('>H', 0x0001) +  # Message Type
-        rrc_request += struct.pack('>I', 1001) +     # UE Identity
-        rrc_request += struct.pack('>H', 0x0001) +   # Establishment Cause
-        rrc_request += struct.pack('>H', 0x0000) +   # Spare
-        rrc_request += struct.pack('>Q', 1234567890123456) +  # IMSI
-        rrc_request += struct.pack('>I', 123456) +   # TMSI
-        rrc_request += struct.pack('>H', 12345) +    # LAI
-        rrc_request += struct.pack('>B', 0x01) +     # RRC State
-        rrc_request += struct.pack('>I', 123456) +   # Cell ID
-        rrc_request += struct.pack('>H', 12345) +    # Tracking Area Code
+        rrc_request = struct.pack('>H', 0x0001)  # Message Type
+        rrc_request += struct.pack('>I', 1001)     # UE Identity
+        rrc_request += struct.pack('>H', 0x0001)   # Establishment Cause
+        rrc_request += struct.pack('>H', 0x0000)   # Spare
+        rrc_request += struct.pack('>Q', 1234567890123456)  # IMSI
+        rrc_request += struct.pack('>I', 123456)   # TMSI
+        rrc_request += struct.pack('>H', 12345)    # LAI
+        rrc_request += struct.pack('>B', 0x01)     # RRC State
+        rrc_request += struct.pack('>I', 123456)   # Cell ID
+        rrc_request += struct.pack('>H', 12345)    # Tracking Area Code
         rrc_request += b'\x00' * 50  # 추가 필드
         
         # RRC Connection Setup Complete
-        rrc_setup = struct.pack('>H', 0x0003) +  # Message Type
-        rrc_setup += struct.pack('>I', 1001) +     # UE Identity
-        rrc_setup += struct.pack('>H', 0x0000) +   # Spare
-        rrc_setup += struct.pack('>H', 0x0041) +   # NAS Message Type
-        rrc_setup += struct.pack('>I', 123456) +   # NAS Transaction ID
-        rrc_setup += struct.pack('>B', 0x01) +     # NAS Security Header
-        rrc_setup += struct.pack('>B', 0x00) +     # NAS Spare
+        rrc_setup = struct.pack('>H', 0x0003)  # Message Type
+        rrc_setup += struct.pack('>I', 1001)     # UE Identity
+        rrc_setup += struct.pack('>H', 0x0000)   # Spare
+        rrc_setup += struct.pack('>H', 0x0041)   # NAS Message Type
+        rrc_setup += struct.pack('>I', 123456)   # NAS Transaction ID
+        rrc_setup += struct.pack('>B', 0x01)     # NAS Security Header
+        rrc_setup += struct.pack('>B', 0x00)     # NAS Spare
         rrc_setup += b'\x00' * 30  # 추가 필드
         
         # RRC Measurement Report
-        rrc_measurement = struct.pack('>H', 0x0005) +  # Message Type
-        rrc_measurement += struct.pack('>I', 1001) +     # UE Identity
-        rrc_measurement += struct.pack('>H', 12345) +   # Cell ID 1
-        rrc_measurement += struct.pack('>B', 0x8C) +     # RSRP (-100)
-        rrc_measurement += struct.pack('>B', 0xF6) +     # RSRQ (-10)
-        rrc_measurement += struct.pack('>B', 0x64) +     # SINR (100)
-        rrc_measurement += struct.pack('>H', 12346) +   # Cell ID 2
-        rrc_measurement += struct.pack('>B', 0x8D) +     # RSRP (-99)
-        rrc_measurement += struct.pack('>B', 0xF7) +     # RSRQ (-9)
-        rrc_measurement += struct.pack('>B', 0x63) +     # SINR (99)
+        rrc_measurement = struct.pack('>H', 0x0005)  # Message Type
+        rrc_measurement += struct.pack('>I', 1001)     # UE Identity
+        rrc_measurement += struct.pack('>H', 12345)   # Cell ID 1
+        rrc_measurement += struct.pack('>B', 0x8C)     # RSRP (-100)
+        rrc_measurement += struct.pack('>B', 0xF6)     # RSRQ (-10)
+        rrc_measurement += struct.pack('>B', 0x64)     # SINR (100)
+        rrc_measurement += struct.pack('>H', 12346)   # Cell ID 2
+        rrc_measurement += struct.pack('>B', 0x8D)     # RSRP (-99)
+        rrc_measurement += struct.pack('>B', 0xF7)     # RSRQ (-9)
+        rrc_measurement += struct.pack('>B', 0x63)     # SINR (99)
         rrc_measurement += b'\x00' * 40  # 추가 필드
         
         # 패킷 저장
