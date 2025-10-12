@@ -373,7 +373,6 @@ device_name = zmq
 device_args = tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000,id=ue
 tx_gain = 76
 rx_gain = 76
-freq = 2680000000
 
 [rat.eutra]
 dl_earfcn = 2680
@@ -1454,7 +1453,6 @@ device_name = zmq
 device_args = tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000,id=ue
 tx_gain = 76
 rx_gain = 76
-freq = 2680000000
 
 [rat.eutra]
 dl_earfcn = 2680
