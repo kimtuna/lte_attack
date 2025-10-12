@@ -49,6 +49,13 @@ class AttackImpactMonitor:
         """시그널 핸들러"""
         print("\n모니터링을 중단합니다...")
         self.monitoring = False
+        
+        # 데이터 저장
+        if self.monitor_data['system_resources']:
+            print("모니터링 데이터를 저장합니다...")
+            filename = self.save_monitoring_data()
+            print(f"데이터 저장 완료: {filename}")
+        
         sys.exit(0)
     
     def get_system_resources(self):
@@ -298,6 +305,12 @@ class AttackImpactMonitor:
             print("\n모니터링이 중단되었습니다.")
         finally:
             self.monitoring = False
+            
+            # 데이터 저장
+            if self.monitor_data['system_resources']:
+                print("모니터링 데이터를 저장합니다...")
+                filename = self.save_monitoring_data()
+                print(f"데이터 저장 완료: {filename}")
         
         print("모니터링 완료")
         return self.monitor_data

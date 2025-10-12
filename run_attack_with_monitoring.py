@@ -95,14 +95,31 @@ class AttackWithMonitoring:
             return
         
         try:
+            # 모니터링 프로세스에 SIGTERM 신호 전송
             self.monitoring_process.terminate()
-            self.monitoring_process.wait(timeout=10)
-            print("모니터링 프로세스 종료")
-        except subprocess.TimeoutExpired:
-            self.monitoring_process.kill()
-            print("모니터링 프로세스 강제 종료")
+            
+            # 프로세스가 정상 종료될 때까지 대기
+            try:
+                stdout, stderr = self.monitoring_process.communicate(timeout=15)
+                print("모니터링 프로세스 정상 종료")
+                
+                # 모니터링 결과 출력
+                if stdout:
+                    print("모니터링 출력:")
+                    print(stdout)
+                if stderr:
+                    print("모니터링 오류:")
+                    print(stderr)
+                    
+            except subprocess.TimeoutExpired:
+                print("모니터링 프로세스 강제 종료")
+                self.monitoring_process.kill()
+                self.monitoring_process.wait()
+                
         except Exception as e:
             print(f"모니터링 중지 오류: {e}")
+            if self.monitoring_process.poll() is None:
+                self.monitoring_process.kill()
     
     def run_attack_with_monitoring(self, attack_config, monitoring_duration=300):
         """공격과 모니터링을 함께 실행"""
