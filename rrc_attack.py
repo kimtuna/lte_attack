@@ -358,41 +358,26 @@ class RealUEAttack:
         print(f"=== 물리 계층 연결 시뮬레이션 시작 ===")
         
         try:
-            # srsRAN UE 설정 파일 생성
+            # srsRAN UE 설정 파일 생성 (최소 설정)
             ue_config = """
 [rf]
 device_name = zmq
-device_args = tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000
-tx_gain = 76
-rx_gain = 76
-freq = 2680000000
+device_args = tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue
 
 [rat.eutra]
 dl_earfcn = 2680
 ul_earfcn = 25680
 
-[rat.eutra.dl]
-nof_prb = 50
-
-[rat.eutra.ul]
-nof_prb = 50
-
 [nas]
 apn = internet
-apn_protocol = ipv4
-user = 
-pass = 
 force_imsi_attach = true
 imsi = 001010123456789
-imei = 353490069873319
-imei_sv = 3534900698733190
 
 [usim]
 algo = milenage
 op = 63BFA50EE9864AAB33CC72DD78524B98
 k = 00112233445566778899AABBCCDDEEFF
 imsi = 001010123456789
-imei = 353490069873319
 """
             
             # 설정 파일 저장
@@ -1435,41 +1420,26 @@ gtp_bind_port = 2123
         print(f"=== srsRAN UE 연결 과정 분석 ===")
         
         try:
-            # 실제 srsRAN UE 실행 및 로그 캡처
+            # 실제 srsRAN UE 실행 및 로그 캡처 (최소 설정)
             ue_config = """
 [rf]
 device_name = zmq
-device_args = tx_port=tcp://localhost:2001,rx_port=tcp://localhost:2000
-tx_gain = 76
-rx_gain = 76
-freq = 2680000000
+device_args = tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue
 
 [rat.eutra]
 dl_earfcn = 2680
 ul_earfcn = 25680
 
-[rat.eutra.dl]
-nof_prb = 50
-
-[rat.eutra.ul]
-nof_prb = 50
-
 [nas]
 apn = internet
-apn_protocol = ipv4
-user = 
-pass = 
 force_imsi_attach = true
 imsi = 001010123456789
-imei = 353490069873319
-imei_sv = 3534900698733190
 
 [usim]
 algo = milenage
 op = 63BFA50EE9864AAB33CC72DD78524B98
 k = 00112233445566778899AABBCCDDEEFF
 imsi = 001010123456789
-imei = 353490069873319
 """
             
             # 설정 파일 저장
@@ -1491,10 +1461,11 @@ imei = 353490069873319
             start_time = time.time()
             
             while (time.time() - start_time) < 60:  # 60초 동안 모니터링
+                # stdout과 stderr 모두 읽기
                 line = process.stdout.readline()
                 if line:
                     timestamp = datetime.now().strftime('%H:%M:%S')
-                    log_entry = f"[{timestamp}] {line.strip()}"
+                    log_entry = f"[{timestamp}] STDOUT: {line.strip()}"
                     connection_logs.append(log_entry)
                     print(log_entry)
                     
@@ -1502,8 +1473,30 @@ imei = 353490069873319
                     if "RRC Connected" in line or "Attach successful" in line:
                         print("✓ 연결 성공!")
                         break
-                elif process.poll() is not None:
+                
+                # stderr도 확인
+                stderr_line = process.stderr.readline()
+                if stderr_line:
+                    timestamp = datetime.now().strftime('%H:%M:%S')
+                    log_entry = f"[{timestamp}] STDERR: {stderr_line.strip()}"
+                    connection_logs.append(log_entry)
+                    print(log_entry)
+                
+                if process.poll() is not None:
                     print("UE 프로세스 종료됨")
+                    # 종료 전 남은 출력 읽기
+                    remaining_stdout = process.stdout.read()
+                    remaining_stderr = process.stderr.read()
+                    if remaining_stdout:
+                        timestamp = datetime.now().strftime('%H:%M:%S')
+                        log_entry = f"[{timestamp}] STDOUT_REMAINING: {remaining_stdout.strip()}"
+                        connection_logs.append(log_entry)
+                        print(log_entry)
+                    if remaining_stderr:
+                        timestamp = datetime.now().strftime('%H:%M:%S')
+                        log_entry = f"[{timestamp}] STDERR_REMAINING: {remaining_stderr.strip()}"
+                        connection_logs.append(log_entry)
+                        print(log_entry)
                     break
                 
                 time.sleep(0.1)
