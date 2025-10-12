@@ -62,11 +62,10 @@ class RealUERRCCapture:
         
         print(f"\n=== 캡처된 패킷 분석 ===")
         
-        # RRC 메시지 필터링
+        # 모든 패킷 분석 (필터 제거)
         cmd = [
             "tshark",
             "-r", capture_file,
-            "-Y", "tcp.len > 0 and (tcp.port == 2000 or tcp.port == 2001)",
             "-T", "fields",
             "-e", "frame.time",
             "-e", "ip.src",
@@ -86,34 +85,36 @@ class RealUERRCCapture:
                 return False
             
             print(f"총 {len(lines)}개 패킷 분석")
-            print("\n=== RRC 메시지 분석 결과 ===")
+            print("\n=== 모든 패킷 분석 결과 ===")
             
             for i, line in enumerate(lines):
                 parts = line.split('\t')
                 if len(parts) >= 7:
                     timestamp, ip_src, ip_dst, src_port, dst_port, tcp_len, data = parts
                     
-                    # 포트 2000으로 가는 패킷 (UE → eNB)
-                    if dst_port == "2000":
-                        print(f"\n[패킷 {i+1}] UE → eNB (포트 2000)")
+                    # 포트 2000 또는 2001과 관련된 패킷만 표시
+                    if dst_port in ["2000", "2001"] or src_port in ["2000", "2001"]:
+                        direction = "UE→eNB" if dst_port == "2000" else "eNB→UE" if src_port == "2001" else "Unknown"
+                        print(f"\n[패킷 {i+1}] {direction}")
                         print(f"  시간: {timestamp}")
                         print(f"  소스: {ip_src}:{src_port}")
                         print(f"  대상: {ip_dst}:{dst_port}")
                         print(f"  크기: {tcp_len} bytes")
                         print(f"  데이터: {data}")
                         
-                        # RRC 메시지 타입 추출
+                        # RRC 메시지 타입 추출 (데이터가 있는 경우)
                         if data and len(data) >= 4:
                             try:
                                 # 첫 2바이트에서 메시지 타입 추출
                                 msg_type = int(data[:4], 16)
-                                print(f"  RRC 메시지 타입: 0x{msg_type:04X}")
+                                print(f"  메시지 타입: 0x{msg_type:04X}")
                                 
                                 # 메시지 저장
                                 self.captured_packets.append({
                                     'timestamp': timestamp,
-                                    'direction': 'UE→eNB',
-                                    'port': dst_port,
+                                    'direction': direction,
+                                    'src_port': src_port,
+                                    'dst_port': dst_port,
                                     'size': tcp_len,
                                     'data': data,
                                     'message_type': f"0x{msg_type:04X}"
