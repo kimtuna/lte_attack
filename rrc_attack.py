@@ -385,8 +385,21 @@ imsi = 001010123456789
             with open(config_file, 'w') as f:
                 f.write(ue_config)
             
-            # srsRAN UE 프로세스 시작
-            cmd = ["sudo", "srsue", "-c", config_file]
+            # srsRAN UE 프로세스 시작 (명령행 옵션 사용)
+            cmd = [
+                "sudo", "srsue",
+                "--rf.device_name=zmq",
+                "--rf.device_args=tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue",
+                "--rat.eutra.dl_earfcn=2680",
+                "--rat.eutra.ul_earfcn=25680",
+                "--nas.apn=internet",
+                "--nas.force_imsi_attach=true",
+                "--nas.imsi=001010123456789",
+                "--usim.algo=milenage",
+                "--usim.op=63BFA50EE9864AAB33CC72DD78524B98",
+                "--usim.k=00112233445566778899AABBCCDDEEFF",
+                "--usim.imsi=001010123456789"
+            ]
             
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
                                      stderr=subprocess.PIPE, text=True)
@@ -1447,8 +1460,21 @@ imsi = 001010123456789
             with open(config_file, 'w') as f:
                 f.write(ue_config)
             
-            # srsRAN UE 프로세스 시작 (로그 캡처)
-            cmd = ["sudo", "srsue", "-c", config_file, "-v"]
+            # srsRAN UE 프로세스 시작 (명령행 옵션 사용)
+            cmd = [
+                "sudo", "srsue", "-v",
+                "--rf.device_name=zmq",
+                "--rf.device_args=tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue",
+                "--rat.eutra.dl_earfcn=2680",
+                "--rat.eutra.ul_earfcn=25680",
+                "--nas.apn=internet",
+                "--nas.force_imsi_attach=true",
+                "--nas.imsi=001010123456789",
+                "--usim.algo=milenage",
+                "--usim.op=63BFA50EE9864AAB33CC72DD78524B98",
+                "--usim.k=00112233445566778899AABBCCDDEEFF",
+                "--usim.imsi=001010123456789"
+            ]
             
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
                                      stderr=subprocess.PIPE, text=True)
