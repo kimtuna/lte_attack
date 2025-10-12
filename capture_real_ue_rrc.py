@@ -66,7 +66,7 @@ class RealUERRCCapture:
         cmd = [
             "tshark",
             "-r", capture_file,
-            "-Y", "tcp.len > 0 and (port 2000 or port 2001)",
+            "-Y", "tcp.len > 0 and (tcp.port == 2000 or tcp.port == 2001)",
             "-T", "fields",
             "-e", "frame.time",
             "-e", "ip.src",
