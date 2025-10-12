@@ -373,7 +373,7 @@ class RealUEAttack:
             cmd = [
                 "sudo", "srsue",
                 "--rf.device_name=zmq",
-                "--rf.device_args=tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue",
+                "--rf.device_args=tx_port=tcp://localhost:2002,rx_port=tcp://localhost:2003,id=ue",
                 "--rat.eutra.dl_earfcn=2680",
                 "--usim.imsi=001010123456789",
                 "--usim.k=00112233445566778899AABBCCDDEEFF",
@@ -1440,7 +1440,7 @@ gtp_bind_port = 2123
             cmd = [
                 "sudo", "srsue",
                 "--rf.device_name=zmq",
-                "--rf.device_args=tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue",
+                "--rf.device_args=tx_port=tcp://localhost:2002,rx_port=tcp://localhost:2003,id=ue",
                 "--rat.eutra.dl_earfcn=2680",
                 "--usim.imsi=001010123456789",
                 "--usim.k=00112233445566778899AABBCCDDEEFF",
