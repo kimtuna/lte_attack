@@ -369,19 +369,15 @@ class RealUEAttack:
             with open(config_file, 'w') as f:
                 f.write(ue_config)
             
-            # srsRAN UE 프로세스 시작 (설정 파일 사용)
+            # srsRAN UE 프로세스 시작 (최소 옵션만)
             cmd = [
                 "sudo", "srsue",
                 "--rf.device_name=zmq",
                 "--rf.device_args=tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue",
                 "--rat.eutra.dl_earfcn=2680",
-                "--rat.eutra.ul_earfcn=25680",
-                "--nas.apn=internet",
-                "--nas.force_imsi_attach=1",
-                "--usim.algo=milenage",
-                "--usim.op=63BFA50EE9864AAB33CC72DD78524B98",
-                "--usim.k=00112233445566778899AABBCCDDEEFF",
                 "--usim.imsi=001010123456789",
+                "--usim.k=00112233445566778899AABBCCDDEEFF",
+                "--usim.op=63BFA50EE9864AAB33CC72DD78524B98",
                 config_file
             ]
             
@@ -1371,6 +1367,11 @@ gtp_bind_port = 2123
             print("UE 시작 실패")
             return False
         
+        # UE 프로세스가 이미 종료되었는지 확인
+        if ue_process.poll() is not None:
+            print("UE 프로세스가 즉시 종료됨")
+            return False
+        
         # 3. 연결 상태 모니터링
         print(f"3. 연결 상태 모니터링 (30초)...")
         start_time = time.time()
@@ -1393,7 +1394,6 @@ gtp_bind_port = 2123
                 socket.close()
                 
                 print(f"테스트 메시지 전송: {test_message.hex()}")
-                time.sleep(1)
                 
             except Exception as e:
                 print(f"메시지 전송 실패: {e}")
@@ -1428,24 +1428,17 @@ gtp_bind_port = 2123
             with open(config_file, 'w') as f:
                 f.write(ue_config)
             
-            # srsRAN UE 프로세스 시작 (상세 로그 포함)
+            # srsRAN UE 프로세스 시작 (최소 옵션 + 상세 로그)
             cmd = [
                 "sudo", "srsue",
                 "--rf.device_name=zmq",
                 "--rf.device_args=tx_port=tcp://localhost:2000,rx_port=tcp://localhost:2001,id=ue",
                 "--rat.eutra.dl_earfcn=2680",
-                "--rat.eutra.ul_earfcn=25680",
-                "--nas.apn=internet",
-                "--nas.force_imsi_attach=1",
-                "--usim.algo=milenage",
-                "--usim.op=63BFA50EE9864AAB33CC72DD78524B98",
-                "--usim.k=00112233445566778899AABBCCDDEEFF",
                 "--usim.imsi=001010123456789",
+                "--usim.k=00112233445566778899AABBCCDDEEFF",
+                "--usim.op=63BFA50EE9864AAB33CC72DD78524B98",
                 "--log.all_level=debug",
                 "--log.rf_level=debug",
-                "--log.phy_level=debug",
-                "--log.rrc_level=debug",
-                "--log.nas_level=debug",
                 config_file
             ]
             
