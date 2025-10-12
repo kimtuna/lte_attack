@@ -10,9 +10,17 @@ import json
 import os
 import threading
 from datetime import datetime
-import psutil
 import signal
 import sys
+
+# psutil이 없으면 기본 모니터링만 수행
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("경고: psutil이 설치되지 않았습니다. 기본 모니터링만 수행합니다.")
+    print("설치: pip3 install psutil")
 
 class AttackImpactMonitor:
     """공격 영향 모니터링 클래스"""
@@ -45,6 +53,9 @@ class AttackImpactMonitor:
     
     def get_system_resources(self):
         """시스템 리소스 정보 수집"""
+        if not PSUTIL_AVAILABLE:
+            return self.get_system_resources_basic()
+        
         try:
             # CPU 사용률
             cpu_percent = psutil.cpu_percent(interval=1)
@@ -82,6 +93,88 @@ class AttackImpactMonitor:
             }
         except Exception as e:
             print(f"시스템 리소스 수집 오류: {e}")
+            return None
+    
+    def get_system_resources_basic(self):
+        """기본 시스템 리소스 정보 수집 (psutil 없이)"""
+        try:
+            # top 명령어로 CPU 사용률 확인
+            cpu_result = subprocess.run(['top', '-bn1'], capture_output=True, text=True)
+            cpu_percent = 0.0
+            if cpu_result.returncode == 0:
+                lines = cpu_result.stdout.split('\n')
+                for line in lines:
+                    if 'Cpu(s)' in line:
+                        # CPU 사용률 파싱
+                        parts = line.split(',')
+                        for part in parts:
+                            if 'us' in part:
+                                cpu_percent = float(part.split('%')[0].split()[-1])
+                                break
+            
+            # free 명령어로 메모리 사용률 확인
+            memory_result = subprocess.run(['free', '-m'], capture_output=True, text=True)
+            memory_percent = 0.0
+            memory_available_gb = 0.0
+            if memory_result.returncode == 0:
+                lines = memory_result.stdout.split('\n')
+                if len(lines) > 1:
+                    mem_line = lines[1].split()
+                    if len(mem_line) >= 7:
+                        total_mem = int(mem_line[1])
+                        used_mem = int(mem_line[2])
+                        available_mem = int(mem_line[6])
+                        memory_percent = (used_mem / total_mem) * 100
+                        memory_available_gb = available_mem / 1024
+            
+            # df 명령어로 디스크 사용률 확인
+            disk_result = subprocess.run(['df', '-h', '/'], capture_output=True, text=True)
+            disk_percent = 0.0
+            if disk_result.returncode == 0:
+                lines = disk_result.stdout.split('\n')
+                if len(lines) > 1:
+                    disk_line = lines[1].split()
+                    if len(disk_line) >= 5:
+                        disk_percent = float(disk_line[4].replace('%', ''))
+            
+            # srsRAN 프로세스 확인
+            srsran_resources = {}
+            for process_name in self.srsran_processes:
+                try:
+                    # ps 명령어로 프로세스 확인
+                    ps_result = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
+                    if ps_result.returncode == 0:
+                        lines = ps_result.stdout.split('\n')
+                        for line in lines:
+                            if process_name in line.lower():
+                                parts = line.split()
+                                if len(parts) >= 11:
+                                    pid = int(parts[1])
+                                    cpu_percent_proc = float(parts[2])
+                                    memory_percent_proc = float(parts[3])
+                                    memory_mb = float(parts[5]) / 1024  # KB to MB
+                                    
+                                    srsran_resources[process_name] = {
+                                        'pid': pid,
+                                        'cpu_percent': cpu_percent_proc,
+                                        'memory_percent': memory_percent_proc,
+                                        'memory_mb': memory_mb
+                                    }
+                                    break
+                except Exception as e:
+                    print(f"프로세스 {process_name} 확인 오류: {e}")
+                    continue
+            
+            return {
+                'timestamp': datetime.now().isoformat(),
+                'cpu_percent': cpu_percent,
+                'memory_percent': memory_percent,
+                'memory_available_gb': memory_available_gb,
+                'disk_percent': disk_percent,
+                'srsran_processes': srsran_resources
+            }
+        except Exception as e:
+            print(f"기본 시스템 리소스 수집 오류: {e}")
             return None
     
     def get_srsran_logs(self):
