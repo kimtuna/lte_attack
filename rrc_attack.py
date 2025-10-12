@@ -385,7 +385,7 @@ imsi = 001010123456789
             with open(config_file, 'w') as f:
                 f.write(ue_config)
             
-            # srsRAN UE 프로세스 시작 (명령행 옵션 사용)
+            # srsRAN UE 프로세스 시작 (설정 파일 사용)
             cmd = [
                 "sudo", "srsue",
                 "--rf.device_name=zmq",
@@ -393,12 +393,12 @@ imsi = 001010123456789
                 "--rat.eutra.dl_earfcn=2680",
                 "--rat.eutra.ul_earfcn=25680",
                 "--nas.apn=internet",
-                "--nas.force_imsi_attach=true",
-                "--nas.imsi=001010123456789",
+                "--nas.force_imsi_attach=1",
                 "--usim.algo=milenage",
                 "--usim.op=63BFA50EE9864AAB33CC72DD78524B98",
                 "--usim.k=00112233445566778899AABBCCDDEEFF",
-                "--usim.imsi=001010123456789"
+                "--usim.imsi=001010123456789",
+                config_file
             ]
             
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
@@ -1460,7 +1460,7 @@ imsi = 001010123456789
             with open(config_file, 'w') as f:
                 f.write(ue_config)
             
-            # srsRAN UE 프로세스 시작 (명령행 옵션 사용)
+            # srsRAN UE 프로세스 시작 (설정 파일 사용)
             cmd = [
                 "sudo", "srsue", "-v",
                 "--rf.device_name=zmq",
@@ -1468,12 +1468,12 @@ imsi = 001010123456789
                 "--rat.eutra.dl_earfcn=2680",
                 "--rat.eutra.ul_earfcn=25680",
                 "--nas.apn=internet",
-                "--nas.force_imsi_attach=true",
-                "--nas.imsi=001010123456789",
+                "--nas.force_imsi_attach=1",
                 "--usim.algo=milenage",
                 "--usim.op=63BFA50EE9864AAB33CC72DD78524B98",
                 "--usim.k=00112233445566778899AABBCCDDEEFF",
-                "--usim.imsi=001010123456789"
+                "--usim.imsi=001010123456789",
+                config_file
             ]
             
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
