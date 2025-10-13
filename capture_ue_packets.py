@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-srsUE 실제 패킷 캡처 및 분석 스크립트
-tun_srsue 인터페이스에서 실제 RRC 메시지를 캡처합니다.
+UE가 eNB에게 보내는 패킷 캡처 및 분석
+실제 srsUE의 RRC 메시지를 캡처하여 형식을 분석합니다.
 """
 
 import subprocess
@@ -11,28 +11,26 @@ import signal
 import sys
 import os
 from datetime import datetime
-import threading
 
-class SrsUEPacketCapture:
+class UEPacketCapture:
     def __init__(self):
         self.capture_process = None
-        self.captured_packets = []
         self.capture_file = None
-        self.running = False
         
     def start_capture(self, duration=60):
         """패킷 캡처 시작"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.capture_file = f"/tmp/srsue_packets_{timestamp}.pcap"
+        self.capture_file = f"/tmp/ue_packets_{timestamp}.pcap"
         
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 패킷 캡처 시작...")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] UE 패킷 캡처 시작...")
         print(f"캡처 파일: {self.capture_file}")
         print(f"지속 시간: {duration}초")
+        print("=" * 50)
         
-        # tcpdump 명령어 구성
+        # tcpdump 명령어 - 루프백 인터페이스에서 srsRAN 포트 캡처
         cmd = [
             "sudo", "tcpdump",
-            "-i", "tun_srsue",  # srsUE 터널 인터페이스
+            "-i", "lo",  # 루프백 인터페이스
             "-w", self.capture_file,
             "-n",  # DNS 조회 비활성화
             "-v",  # 상세 출력
@@ -47,22 +45,22 @@ class SrsUEPacketCapture:
                 text=True
             )
             
-            self.running = True
             print(f"[{datetime.now().strftime('%H:%M:%S')}] 캡처 프로세스 시작됨 (PID: {self.capture_process.pid})")
+            print("srsUE를 실행하여 RRC 메시지를 생성하세요...")
             
             # 지정된 시간 동안 캡처
             time.sleep(duration)
             
+            return True
+            
         except Exception as e:
             print(f"캡처 시작 오류: {e}")
             return False
-            
-        return True
     
     def stop_capture(self):
         """패킷 캡처 중지"""
-        if self.capture_process and self.running:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] 캡처 중지 중...")
+        if self.capture_process:
+            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 캡처 중지 중...")
             
             # 프로세스 종료
             self.capture_process.terminate()
@@ -74,9 +72,7 @@ class SrsUEPacketCapture:
                 self.capture_process.kill()
                 self.capture_process.wait()
             
-            self.running = False
             print(f"[{datetime.now().strftime('%H:%M:%S')}] 캡처 완료")
-            
             return True
         return False
     
@@ -113,26 +109,33 @@ class SrsUEPacketCapture:
                         "timestamp": datetime.now().isoformat(),
                         "capture_file": self.capture_file,
                         "total_packets": len(packets_data),
-                        "description": "srsUE 패킷 분석 결과"
+                        "description": "UE RRC 메시지 분석 결과"
                     },
-                    "packets": []
+                    "rrc_messages": [],
+                    "all_packets": []
                 }
                 
                 for packet in packets_data:
-                    packet_info = {
-                        "timestamp": packet.get("_source", {}).get("layers", {}).get("frame.time", [""])[0],
-                        "src_ip": packet.get("_source", {}).get("layers", {}).get("ip.src", [""])[0],
-                        "dst_ip": packet.get("_source", {}).get("layers", {}).get("ip.dst", [""])[0],
-                        "src_port": packet.get("_source", {}).get("layers", {}).get("tcp.srcport", [""])[0],
-                        "dst_port": packet.get("_source", {}).get("layers", {}).get("tcp.dstport", [""])[0],
-                        "payload": packet.get("_source", {}).get("layers", {}).get("tcp.payload", [""])[0]
+                    packet_info = packet.get("_source", {}).get("layers", {})
+                    
+                    packet_data = {
+                        "timestamp": packet_info.get("frame.time", [""])[0],
+                        "src_ip": packet_info.get("ip.src", [""])[0],
+                        "dst_ip": packet_info.get("ip.dst", [""])[0],
+                        "src_port": packet_info.get("tcp.srcport", [""])[0],
+                        "dst_port": packet_info.get("tcp.dstport", [""])[0],
+                        "payload": packet_info.get("tcp.payload", [""])[0]
                     }
                     
                     # UDP 페이로드도 확인
-                    if not packet_info["payload"]:
-                        packet_info["payload"] = packet.get("_source", {}).get("layers", {}).get("udp.payload", [""])[0]
+                    if not packet_data["payload"]:
+                        packet_data["payload"] = packet_info.get("udp.payload", [""])[0]
                     
-                    analysis_result["packets"].append(packet_info)
+                    analysis_result["all_packets"].append(packet_data)
+                    
+                    # RRC 메시지 필터링 (페이로드가 있는 패킷)
+                    if packet_data["payload"] and len(packet_data["payload"]) > 0:
+                        analysis_result["rrc_messages"].append(packet_data)
                 
                 return analysis_result
             else:
@@ -148,11 +151,8 @@ class SrsUEPacketCapture:
         if not analysis_result:
             return None
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = f"logs/srsue_packet_analysis_{timestamp}.json"
-        
-        # logs 디렉토리 생성
-        os.makedirs("logs", exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S in")
+        output_file = f"ue_packet_analysis_{timestamp}.json"
         
         try:
             with open(output_file, 'w', encoding='utf-8') as f:
@@ -174,9 +174,9 @@ def main():
     """메인 함수"""
     import argparse
     
-    parser = argparse.ArgumentParser(description="srsUE 패킷 캡처 및 분석")
+    parser = argparse.ArgumentParser(description="UE RRC 메시지 캡처 및 분석")
     parser.add_argument("--duration", type=int, default=60, help="캡처 지속 시간 (초)")
-    parser.add_argument("--interface", default="tun_srsue", help="캡처할 인터페이스")
+    parser.add_argument("--analyze", help="기존 캡처 파일 분석")
     
     args = parser.parse_args()
     
@@ -184,13 +184,56 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    print("=== srsUE 패킷 캡처 및 분석 ===")
-    print(f"인터페이스: {args.interface}")
+    print("=== UE RRC 메시지 캡처 및 분석 ===")
+    
+    # 기존 파일 분석 모드
+    if args.analyze:
+        print(f"분석할 파일: {args.analyze}")
+        print("=" * 50)
+        
+        capture = UEPacketCapture()
+        capture.capture_file = args.analyze
+        
+        try:
+            # 패킷 분석
+            analysis_result = capture.analyze_packets()
+            
+            if analysis_result:
+                # 결과 저장
+                output_file = capture.save_analysis(analysis_result)
+                
+                if output_file:
+                    print(f"\n=== 분석 완료 ===")
+                    print(f"총 패킷 수: {analysis_result['analysis_info']['total_packets']}")
+                    print(f"RRC 메시지 수: {len(analysis_result['rrc_messages'])}")
+                    print(f"분석 파일: {output_file}")
+                    
+                    # RRC 메시지 요약 출력
+                    if analysis_result["rrc_messages"]:
+                        print(f"\n=== RRC 메시지 요약 ===")
+                        for i, msg in enumerate(analysis_result["rrc_messages"][:10]):  # 처음 10개
+                            print(f"메시지 {i+1}:")
+                            print(f"  시간: {msg['timestamp']}")
+                            print(f"  소스: {msg['src_ip']}:{msg['src_port']}")
+                            print(f"  대상: {msg['dst_ip']}:{msg['dst_port']}")
+                            print(f"  페이로드: {msg['payload'][:100]}..." if len(msg['payload']) > 100 else f"  페이로드: {msg['payload']}")
+                            print()
+                    else:
+                        print("RRC 메시지가 캡처되지 않았습니다.")
+                else:
+                    print("분석 결과 저장 실패")
+            else:
+                print("패킷 분석 실패")
+        except Exception as e:
+            print(f"분석 오류: {e}")
+        
+        return
+    
     print(f"지속 시간: {args.duration}초")
-    print("=" * 40)
+    print("=" * 50)
     
     # 캡처 시작
-    capture = SrsUEPacketCapture()
+    capture = UEPacketCapture()
     
     try:
         # 패킷 캡처
@@ -207,21 +250,23 @@ def main():
                 if output_file:
                     print(f"\n=== 캡처 완료 ===")
                     print(f"총 패킷 수: {analysis_result['analysis_info']['total_packets']}")
+                    print(f"RRC 메시지 수: {len(analysis_result['rrc_messages'])}")
                     print(f"분석 파일: {output_file}")
                     print(f"원본 캡처: {capture.capture_file}")
                     
-                    # 패킷 요약 출력
-                    if analysis_result["packets"]:
-                        print(f"\n=== 패킷 요약 ===")
-                        for i, packet in enumerate(analysis_result["packets"][:5]):  # 처음 5개만
-                            print(f"패킷 {i+1}:")
-                            print(f"  시간: {packet['timestamp']}")
-                            print(f"  소스: {packet['src_ip']}:{packet['src_port']}")
-                            print(f"  대상: {packet['dst_ip']}:{packet['dst_port']}")
-                            print(f"  페이로드: {packet['payload'][:50]}..." if len(packet['payload']) > 50 else f"  페이로드: {packet['payload']}")
+                    # RRC 메시지 요약 출력
+                    if analysis_result["rrc_messages"]:
+                        print(f"\n=== RRC 메시지 요약 ===")
+                        for i, msg in enumerate(analysis_result["rrc_messages"][:5]):  # 처음 5개만
+                            print(f"메시지 {i+1}:")
+                            print(f"  시간: {msg['timestamp']}")
+                            print(f"  소스: {msg['src_ip']}:{msg['src_port']}")
+                            print(f"  대상: {msg['dst_ip']}:{msg['dst_port']}")
+                            print(f"  페이로드: {msg['payload'][:100]}..." if len(msg['payload']) > 100 else f"  페이로드: {msg['payload']}")
                             print()
                     else:
-                        print("캡처된 패킷이 없습니다.")
+                        print("RRC 메시지가 캡처되지 않았습니다.")
+                        print("srsUE가 실행되지 않았거나 연결에 실패했을 수 있습니다.")
                 else:
                     print("분석 결과 저장 실패")
             else:
