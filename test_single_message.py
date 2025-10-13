@@ -358,18 +358,37 @@ def main():
     parser.add_argument('--enb-port', type=int, default=2000, help='eNB 포트')
     parser.add_argument('--message-type', choices=['connection_request', 'reestablishment_request'], 
                        default='reestablishment_request', help='메시지 타입')
+    parser.add_argument('--comprehensive', action='store_true', help='종합 테스트 실행')
     
     args = parser.parse_args()
     
     tester = SingleMessageTester(args.enb_ip, args.enb_port)
     
-    if args.message_type:
+    if args.comprehensive:
+        # 종합 테스트
+        tester.run_comprehensive_test()
+    else:
         # 단일 메시지 테스트
         result = tester.send_single_message(args.message_type)
         print(f"\n결과: {result}")
-    else:
-        # 종합 테스트
-        tester.run_comprehensive_test()
+        
+        # 결과 저장
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        result_file = f"{tester.log_dir}/single_message_test_{timestamp}.json"
+        
+        test_data = {
+            'test_info': {
+                'target_ip': args.enb_ip,
+                'target_port': args.enb_port,
+                'timestamp': datetime.now().isoformat()
+            },
+            'test_results': [result]
+        }
+        
+        with open(result_file, 'w', encoding='utf-8') as f:
+            json.dump(test_data, f, indent=2, ensure_ascii=False)
+        
+        print(f"\n✅ 테스트 결과 저장: {result_file}")
 
 if __name__ == "__main__":
     main()
