@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-RRC Flooding Attack 테스트 스크립트
-srsRAN 환경에서 flooding 공격 효과 테스트
+TCP 기반 RRC Flooding Attack 테스트 스크립트
+srsRAN 환경에서 TCP flooding 공격 효과 테스트
 """
 
 import subprocess
@@ -10,8 +10,8 @@ import json
 import os
 from datetime import datetime
 
-class RRCFloodingTest:
-    """RRC Flooding Attack 테스트 클래스"""
+class TCPFloodingTest:
+    """TCP 기반 RRC Flooding Attack 테스트 클래스"""
     
     def __init__(self):
         self.log_dir = "logs"
@@ -45,12 +45,35 @@ class RRCFloodingTest:
             print(f"프로세스 확인 오류: {e}")
             return False
     
+    def check_tcp_connection(self, enb_ip='127.0.0.1', enb_port=2001):
+        """TCP 연결 상태 확인"""
+        print(f"=== TCP 연결 상태 확인 ({enb_ip}:{enb_port}) ===")
+        
+        try:
+            import socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5.0)
+            
+            result = sock.connect_ex((enb_ip, enb_port))
+            sock.close()
+            
+            if result == 0:
+                print(f"✅ TCP 연결 성공: {enb_ip}:{enb_port}")
+                return True
+            else:
+                print(f"❌ TCP 연결 실패: {result}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ TCP 연결 오류: {e}")
+            return False
+    
     def monitor_system_resources(self, duration=60):
         """시스템 리소스 모니터링"""
         print(f"=== 시스템 리소스 모니터링 ({duration}초) ===")
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        monitor_file = f"{self.log_dir}/system_monitor_{timestamp}.log"
+        monitor_file = f"{self.log_dir}/tcp_system_monitor_{timestamp}.log"
         
         try:
             # top 명령어로 CPU/메모리 사용률 모니터링
@@ -68,8 +91,8 @@ class RRCFloodingTest:
             return None
     
     def run_flooding_test(self, test_config):
-        """Flooding 테스트 실행"""
-        print("=== RRC Flooding Attack 테스트 실행 ===")
+        """TCP Flooding 테스트 실행"""
+        print("=== TCP RRC Flooding Attack 테스트 실행 ===")
         
         # 테스트 설정 출력
         print(f"테스트 설정:")
@@ -80,9 +103,9 @@ class RRCFloodingTest:
         # 시스템 모니터링 시작 (백그라운드)
         monitor_file = self.monitor_system_resources(test_config['duration'] + 10)
         
-        # Flooding 공격 실행
+        # TCP Flooding 공격 실행
         cmd = [
-            'python3', 'rrc_flooding_attack.py',
+            'python3', 'tcp_rrc_flooding_attack.py',
             '--enb-ip', test_config['enb_ip'],
             '--enb-port', str(test_config['enb_port']),
             '--threads', str(test_config['threads']),
@@ -91,12 +114,12 @@ class RRCFloodingTest:
         ]
         
         print(f"실행 명령: {' '.join(cmd)}")
-        print("Flooding 공격 시작...")
+        print("TCP Flooding 공격 시작...")
         
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=test_config['duration'] + 30)
             
-            print("=== Flooding 공격 결과 ===")
+            print("=== TCP Flooding 공격 결과 ===")
             print("STDOUT:")
             print(result.stdout)
             
@@ -115,10 +138,10 @@ class RRCFloodingTest:
     
     def analyze_test_results(self, test_config):
         """테스트 결과 분석"""
-        print("=== 테스트 결과 분석 ===")
+        print("=== TCP 테스트 결과 분석 ===")
         
         # 최근 로그 파일 찾기
-        log_files = [f for f in os.listdir(self.log_dir) if f.startswith('flooding_attack_')]
+        log_files = [f for f in os.listdir(self.log_dir) if f.startswith('tcp_flooding_attack_')]
         if not log_files:
             print("분석할 로그 파일이 없습니다.")
             return
@@ -132,7 +155,10 @@ class RRCFloodingTest:
             
             print(f"분석 파일: {log_path}")
             print(f"총 전송 메시지: {log_data['results']['total_messages']}")
+            print(f"총 응답 수신: {log_data['results']['total_responses']}")
+            print(f"응답 수신률: {log_data['results']['response_rate']:.2f}%")
             print(f"초당 메시지 수: {log_data['results']['messages_per_second']:.2f}")
+            print(f"평균 응답 시간: {log_data['results']['avg_response_time_ms']:.2f}ms")
             print(f"오류 수: {log_data['results']['errors']}")
             
             # 성공률 계산
@@ -143,39 +169,44 @@ class RRCFloodingTest:
             print(f"로그 분석 오류: {e}")
     
     def run_comprehensive_test(self):
-        """종합 테스트 실행"""
-        print("=== 종합 RRC Flooding 테스트 ===")
+        """종합 TCP 테스트 실행"""
+        print("=== 종합 TCP RRC Flooding 테스트 ===")
         
         # srsRAN 상태 확인
         if not self.check_srsran_status():
             print("srsRAN이 실행되지 않았습니다. 테스트를 중단합니다.")
             return
         
+        # TCP 연결 확인
+        if not self.check_tcp_connection():
+            print("TCP 연결이 실패했습니다. 테스트를 중단합니다.")
+            return
+        
         # 테스트 시나리오들
         test_scenarios = [
             {
-                'name': '기본 Connection Request Flooding',
+                'name': '기본 TCP Reestablishment Request Flooding',
                 'enb_ip': '127.0.0.1',
-                'enb_port': 2000,
+                'enb_port': 2001,
+                'threads': 5,
+                'duration': 30,
+                'message_type': 'reestablishment_request'
+            },
+            {
+                'name': '고강도 TCP Reestablishment Request Flooding',
+                'enb_ip': '127.0.0.1',
+                'enb_port': 2001,
+                'threads': 10,
+                'duration': 60,
+                'message_type': 'reestablishment_request'
+            },
+            {
+                'name': 'TCP Connection Request Flooding',
+                'enb_ip': '127.0.0.1',
+                'enb_port': 2001,
                 'threads': 5,
                 'duration': 30,
                 'message_type': 'connection_request'
-            },
-            {
-                'name': '고강도 Connection Request Flooding',
-                'enb_ip': '127.0.0.1',
-                'enb_port': 2000,
-                'threads': 20,
-                'duration': 60,
-                'message_type': 'connection_request'
-            },
-            {
-                'name': 'Reestablishment Request Flooding',
-                'enb_ip': '127.0.0.1',
-                'enb_port': 2000,
-                'threads': 10,
-                'duration': 30,
-                'message_type': 'reestablishment_request'
             }
         ]
         
@@ -203,7 +234,7 @@ class RRCFloodingTest:
         
         # 전체 결과 요약
         print(f"\n{'='*60}")
-        print("전체 테스트 결과 요약")
+        print("전체 TCP 테스트 결과 요약")
         print(f"{'='*60}")
         
         for result in results:
@@ -216,21 +247,25 @@ class RRCFloodingTest:
 def main():
     import argparse
     
-    parser = argparse.ArgumentParser(description='RRC Flooding Attack 테스트')
+    parser = argparse.ArgumentParser(description='TCP 기반 RRC Flooding Attack 테스트')
     parser.add_argument('--comprehensive', action='store_true', help='종합 테스트 실행')
     parser.add_argument('--check-status', action='store_true', help='srsRAN 상태만 확인')
+    parser.add_argument('--check-tcp', action='store_true', help='TCP 연결만 확인')
     
     args = parser.parse_args()
     
-    tester = RRCFloodingTest()
+    tester = TCPFloodingTest()
     
     if args.check_status:
         tester.check_srsran_status()
+    elif args.check_tcp:
+        tester.check_tcp_connection()
     elif args.comprehensive:
         tester.run_comprehensive_test()
     else:
         print("사용법:")
         print("  --check-status: srsRAN 상태 확인")
+        print("  --check-tcp: TCP 연결 확인")
         print("  --comprehensive: 종합 테스트 실행")
 
 if __name__ == "__main__":
