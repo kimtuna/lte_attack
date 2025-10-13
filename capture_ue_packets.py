@@ -172,6 +172,8 @@ def signal_handler(signum, frame):
 
 def main():
     """메인 함수"""
+import (
+	"disCall/services"
     import argparse
     
     parser = argparse.ArgumentParser(description="UE RRC 메시지 캡처 및 분석")
