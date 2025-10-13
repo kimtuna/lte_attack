@@ -68,8 +68,8 @@ class NormalRRCFlowTest:
         print(f"=== eNB 로그 모니터링 ({duration}초) ===")
         
         log_files = [
-            '/tmp/srsenb.log',
-            '/var/log/syslog'
+            '/var/log/syslog',
+            '/var/log/messages'
         ]
         
         log_data = {}

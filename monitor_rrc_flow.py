@@ -44,8 +44,8 @@ class RRCFlowMonitor:
         print("=== eNB 로그 모니터링 시작 ===")
         
         log_files = [
-            '/tmp/srsenb.log',
-            '/var/log/syslog'
+            '/var/log/syslog',
+            '/var/log/messages'
         ]
         
         while self.monitoring:
@@ -93,8 +93,8 @@ class RRCFlowMonitor:
         print("=== EPC 로그 모니터링 시작 ===")
         
         log_files = [
-            '/tmp/srsepc.log',
-            '/var/log/syslog'
+            '/var/log/syslog',
+            '/var/log/messages'
         ]
         
         while self.monitoring:
