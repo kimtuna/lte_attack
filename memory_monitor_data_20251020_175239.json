@@ -1,0 +1,18 @@
+{
+  "stats": {
+    "start_time": "2025-10-20T17:49:38.079897",
+    "end_time": "2025-10-20T17:52:38.193689",
+    "peak_memory": 0,
+    "peak_connections": 0,
+    "crash_time": null,
+    "total_data_points": 0,
+    "monitoring_interval": 1.0
+  },
+  "data": {
+    "timestamps": [],
+    "memory_usage": [],
+    "cpu_usage": [],
+    "connections": [],
+    "process_count": []
+  }
+}
