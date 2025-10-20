@@ -224,7 +224,7 @@ class IntegratedDoSAnalyzer:
             print("시각화할 데이터가 없습니다.")
             return
         
-        # 한글 폰트 설정
+        # 한글 폰트 설정 (Ubuntu 환경)
         plt.rcParams['font.family'] = 'DejaVu Sans'
         plt.rcParams['axes.unicode_minus'] = False
         
@@ -248,53 +248,53 @@ class IntegratedDoSAnalyzer:
         
         # 그래프 생성
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-        fig.suptitle('DoS 공격 통합 분석: 메모리 크래시까지의 과정', fontsize=18, fontweight='bold')
+        fig.suptitle('DoS Attack Analysis: Memory Usage to Crash', fontsize=18, fontweight='bold')
         
         # 1. 메모리 사용률 (메인 차트)
-        axes[0, 0].plot(df['minutes'], df['memory_usage'], 'b-', linewidth=3, label='메모리 사용률')
-        axes[0, 0].axhline(y=95, color='red', linestyle='--', linewidth=2, alpha=0.8, label='크래시 임계점 (95%)')
-        axes[0, 0].axhline(y=80, color='orange', linestyle='--', linewidth=2, alpha=0.7, label='경고 임계점 (80%)')
-        axes[0, 0].axhline(y=60, color='yellow', linestyle='--', linewidth=1, alpha=0.6, label='주의 임계점 (60%)')
+        axes[0, 0].plot(df['minutes'], df['memory_usage'], 'b-', linewidth=3, label='Memory Usage')
+        axes[0, 0].axhline(y=95, color='red', linestyle='--', linewidth=2, alpha=0.8, label='Crash Threshold (95%)')
+        axes[0, 0].axhline(y=80, color='orange', linestyle='--', linewidth=2, alpha=0.7, label='Warning Threshold (80%)')
+        axes[0, 0].axhline(y=60, color='yellow', linestyle='--', linewidth=1, alpha=0.6, label='Caution Threshold (60%)')
         
         if crash_minutes:
             axes[0, 0].axvline(x=crash_minutes, color='red', linestyle=':', linewidth=3, alpha=0.9, 
-                              label=f'크래시 발생 ({crash_minutes:.1f}분)')
+                              label=f'Crash Detected ({crash_minutes:.1f}min)')
         
-        axes[0, 0].set_title('메모리 사용률 변화', fontsize=14, fontweight='bold')
-        axes[0, 0].set_xlabel('시간 (분)', fontsize=12)
-        axes[0, 0].set_ylabel('메모리 사용률 (%)', fontsize=12)
+        axes[0, 0].set_title('Memory Usage Change', fontsize=14, fontweight='bold')
+        axes[0, 0].set_xlabel('Time (minutes)', fontsize=12)
+        axes[0, 0].set_ylabel('Memory Usage (%)', fontsize=12)
         axes[0, 0].legend(fontsize=10)
         axes[0, 0].grid(True, alpha=0.3)
         axes[0, 0].set_ylim(0, 100)
         
         # 2. 네트워크 연결 수
-        axes[0, 1].plot(df['minutes'], df['connections'], 'g-', linewidth=2, label='네트워크 연결 수')
+        axes[0, 1].plot(df['minutes'], df['connections'], 'g-', linewidth=2, label='Network Connections')
         if crash_minutes:
             axes[0, 1].axvline(x=crash_minutes, color='red', linestyle=':', linewidth=2, alpha=0.8)
-        axes[0, 1].set_title('네트워크 연결 수 변화', fontsize=14, fontweight='bold')
-        axes[0, 1].set_xlabel('시간 (분)', fontsize=12)
-        axes[0, 1].set_ylabel('연결 수', fontsize=12)
+        axes[0, 1].set_title('Network Connections Change', fontsize=14, fontweight='bold')
+        axes[0, 1].set_xlabel('Time (minutes)', fontsize=12)
+        axes[0, 1].set_ylabel('Connections', fontsize=12)
         axes[0, 1].legend(fontsize=10)
         axes[0, 1].grid(True, alpha=0.3)
         
         # 3. CPU 사용률
-        axes[1, 0].plot(df['minutes'], df['cpu_usage'], 'purple', linewidth=2, label='CPU 사용률')
+        axes[1, 0].plot(df['minutes'], df['cpu_usage'], 'purple', linewidth=2, label='CPU Usage')
         if crash_minutes:
             axes[1, 0].axvline(x=crash_minutes, color='red', linestyle=':', linewidth=2, alpha=0.8)
-        axes[1, 0].set_title('CPU 사용률 변화', fontsize=14, fontweight='bold')
-        axes[1, 0].set_xlabel('시간 (분)', fontsize=12)
-        axes[1, 0].set_ylabel('CPU 사용률 (%)', fontsize=12)
+        axes[1, 0].set_title('CPU Usage Change', fontsize=14, fontweight='bold')
+        axes[1, 0].set_xlabel('Time (minutes)', fontsize=12)
+        axes[1, 0].set_ylabel('CPU Usage (%)', fontsize=12)
         axes[1, 0].legend(fontsize=10)
         axes[1, 0].grid(True, alpha=0.3)
         axes[1, 0].set_ylim(0, 100)
         
         # 4. 프로세스 수
-        axes[1, 1].plot(df['minutes'], df['process_count'], 'orange', linewidth=2, label='프로세스 수')
+        axes[1, 1].plot(df['minutes'], df['process_count'], 'orange', linewidth=2, label='Process Count')
         if crash_minutes:
             axes[1, 1].axvline(x=crash_minutes, color='red', linestyle=':', linewidth=2, alpha=0.8)
-        axes[1, 1].set_title('프로세스 수 변화', fontsize=14, fontweight='bold')
-        axes[1, 1].set_xlabel('시간 (분)', fontsize=12)
-        axes[1, 1].set_ylabel('프로세스 수', fontsize=12)
+        axes[1, 1].set_title('Process Count Change', fontsize=14, fontweight='bold')
+        axes[1, 1].set_xlabel('Time (minutes)', fontsize=12)
+        axes[1, 1].set_ylabel('Process Count', fontsize=12)
         axes[1, 1].legend(fontsize=10)
         axes[1, 1].grid(True, alpha=0.3)
         
@@ -359,7 +359,7 @@ class IntegratedDoSAnalyzer:
 │ 최대 메모리 사용률: {memory_peak:.1f}%{'':<40} │
 │ 메모리 증가량: {memory_end - memory_start:.1f}%{'':<40} │
 │ 평균 메모리 사용률: {np.mean(memory_data):.1f}%{'':<40} │
-│ 메모리 증가율: {((memory_end - memory_start) / duration):.2f}% per minute{'':<30} │
+│ 메모리 증가율: {((memory_end - memory_start) / duration):.2f}% per minute if duration > 0 else 'N/A'}{'':<25} │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 🔗 네트워크 연결 분석:
@@ -369,7 +369,7 @@ class IntegratedDoSAnalyzer:
 │ 최대 연결 수: {connections_peak}개{'':<40} │
 │ 연결 증가량: {connections_end - connections_start}개{'':<40} │
 │ 평균 연결 수: {np.mean(connections_data):.0f}개{'':<40} │
-│ 연결 증가율: {((connections_end - connections_start) / duration):.1f} connections per minute{'':<20} │
+│ 연결 증가율: {((connections_end - connections_start) / duration):.1f} connections per minute if duration > 0 else 'N/A'}{'':<15} │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 📈 시간별 분석:

@@ -423,12 +423,42 @@ class MemoryVisualizer:
         print("- presentation_summary.txt (요약)")
         
         return True
+    
+    def start_web_server(self, port=8080):
+        """웹 서버 시작"""
+        import subprocess
+        import threading
+        import time
+        
+        def run_server():
+            try:
+                subprocess.run([
+                    "python3", "-m", "http.server", str(port)
+                ], cwd=self.output_dir)
+            except Exception as e:
+                print(f"웹 서버 실행 오류: {e}")
+        
+        # 백그라운드에서 서버 실행
+        server_thread = threading.Thread(target=run_server)
+        server_thread.daemon = True
+        server_thread.start()
+        
+        # 서버 시작 대기
+        time.sleep(2)
+        
+        print(f"\n🌐 웹 서버가 시작되었습니다!")
+        print(f"📱 브라우저에서 접속: http://localhost:{port}")
+        print(f"📁 서빙 디렉토리: {self.output_dir}")
+        print(f"⏹️  서버 중지: Ctrl+C")
+        
+        return server_thread
 
 def main():
     """메인 함수"""
     parser = argparse.ArgumentParser(description="메모리 시각화 도구")
-    parser.add_argument("--data", required=True, help="분석 데이터 JSON 파일")
     parser.add_argument("--output-dir", default="memory_charts", help="출력 디렉토리")
+    parser.add_argument("--web-server", action="store_true", help="웹 서버 자동 시작")
+    parser.add_argument("--port", type=int, default=8080, help="웹 서버 포트")
     
     args = parser.parse_args()
     
@@ -443,6 +473,10 @@ def main():
     
     # 모든 시각화 자료 생성
     visualizer.create_all_presentations()
+    
+    # 웹 서버 시작 (옵션)
+    if args.web_server:
+        visualizer.start_web_server(args.port)
     
     # 요약 출력
     print("\n" + "="*60)
