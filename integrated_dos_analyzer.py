@@ -90,6 +90,12 @@ class IntegratedDoSAnalyzer:
         
         print(f"[{datetime.now().strftime('%H:%M:%S')}] 공격 진행 상황 모니터링 시작")
         
+        # 연결 수 추적을 위한 변수들
+        max_connections = 0
+        connection_drop_threshold = 0.1  # 10% 이하로 떨어지면 크래시로 판단
+        stable_connections = 0
+        connection_drop_count = 0
+        
         while self.running and self.flooding_process.poll() is None:
             try:
                 # 공격 프로세스 상태 확인
@@ -99,12 +105,48 @@ class IntegratedDoSAnalyzer:
                 # 시스템 리소스 확인
                 system_info = self.monitor.get_system_info()
                 if system_info:
-                    # 크래시 감지
+                    current_connections = system_info["connections"]
+                    
+                    # 최대 연결 수 업데이트
+                    if current_connections > max_connections:
+                        max_connections = current_connections
+                        stable_connections = current_connections
+                    
+                    # 연결 수 급격한 감소 감지 (크래시 감지)
+                    if max_connections > 1000:  # 충분한 연결이 있었을 때만 체크
+                        connection_ratio = current_connections / max_connections
+                        
+                        if connection_ratio < connection_drop_threshold:
+                            connection_drop_count += 1
+                            if connection_drop_count >= 3:  # 3회 연속 감소 확인
+                                self.attack_stats["crash_detected"] = True
+                                self.attack_stats["crash_time"] = datetime.now()
+                                crash_duration = (self.attack_stats["crash_time"] - self.attack_stats["start_time"]).total_seconds() / 60
+                                
+                                print(f"\n🚨 SERVER CRASH DETECTED! 🚨")
+                                print(f"시간: {self.attack_stats['crash_time'].strftime('%H:%M:%S')}")
+                                print(f"크래시까지 소요 시간: {crash_duration:.1f}분")
+                                print(f"최대 연결 수: {max_connections}개")
+                                print(f"현재 연결 수: {current_connections}개")
+                                print(f"연결 수 감소율: {(1 - connection_ratio) * 100:.1f}%")
+                                print(f"메모리 사용률: {system_info['memory_percent']:.1f}%")
+                                print("=" * 50)
+                                
+                                # 공격 중지
+                                self.stop_attack()
+                                break
+                        else:
+                            connection_drop_count = 0  # 리셋
+                    
+                    # 기존 메모리 크래시 감지
                     if system_info["memory_percent"] >= 95 and not self.attack_stats["crash_detected"]:
                         self.attack_stats["crash_detected"] = True
                         self.attack_stats["crash_time"] = datetime.now()
-                        print(f"\n🚨 CRASH DETECTED! 🚨")
+                        crash_duration = (self.attack_stats["crash_time"] - self.attack_stats["start_time"]).total_seconds() / 60
+                        
+                        print(f"\n🚨 MEMORY CRASH DETECTED! 🚨")
                         print(f"시간: {self.attack_stats['crash_time'].strftime('%H:%M:%S')}")
+                        print(f"크래시까지 소요 시간: {crash_duration:.1f}분")
                         print(f"메모리 사용률: {system_info['memory_percent']:.1f}%")
                         print(f"연결 수: {system_info['connections']}")
                         print("=" * 50)
@@ -314,45 +356,97 @@ class IntegratedDoSAnalyzer:
         if not self.monitor.timestamps:
             return "분석할 데이터가 없습니다."
         
+        # 크래시 시점까지의 데이터만 분석
+        crash_time = self.attack_stats.get("crash_time")
+        if crash_time:
+            # 크래시 시점까지의 데이터만 필터링
+            crash_data = []
+            for i, timestamp in enumerate(self.monitor.timestamps):
+                if timestamp <= crash_time:
+                    crash_data.append({
+                        'timestamp': timestamp,
+                        'memory': self.monitor.memory_usage[i],
+                        'cpu': self.monitor.cpu_usage[i],
+                        'connections': self.monitor.connections[i],
+                        'processes': self.monitor.process_count[i]
+                    })
+            
+            if not crash_data:
+                return "크래시 시점까지의 데이터가 없습니다."
+            
+            # 크래시까지의 데이터로 분석
+            memory_data = [d['memory'] for d in crash_data]
+            cpu_data = [d['cpu'] for d in crash_data]
+            connections_data = [d['connections'] for d in crash_data]
+            process_data = [d['processes'] for d in crash_data]
+            
+            crash_duration = (crash_time - self.attack_stats["start_time"]).total_seconds() / 60
+        else:
+            # 크래시가 없었다면 전체 데이터 사용
+            memory_data = list(self.monitor.memory_usage)
+            cpu_data = list(self.monitor.cpu_usage)
+            connections_data = list(self.monitor.connections)
+            process_data = list(self.monitor.process_count)
+            crash_duration = (self.attack_stats["end_time"] - self.attack_stats["start_time"]).total_seconds() / 60 if self.attack_stats["end_time"] else 0
+        
         # 기본 통계 계산
-        duration = (self.attack_stats["end_time"] - self.attack_stats["start_time"]).total_seconds() / 60 if self.attack_stats["end_time"] else 0
-        crash_time_minutes = None
-        if self.attack_stats["crash_time"] and self.attack_stats["start_time"]:
-            crash_time_minutes = (self.attack_stats["crash_time"] - self.attack_stats["start_time"]).total_seconds() / 60
+        duration = crash_duration
         
         # 메모리 통계
-        memory_data = list(self.monitor.memory_usage)
         memory_start = memory_data[0] if memory_data else 0
         memory_end = memory_data[-1] if memory_data else 0
         memory_peak = max(memory_data) if memory_data else 0
         
         # 연결 통계
-        connections_data = list(self.monitor.connections)
         connections_start = connections_data[0] if connections_data else 0
         connections_end = connections_data[-1] if connections_data else 0
         connections_peak = max(connections_data) if connections_data else 0
+        
+        # 크래시 감지 정보 생성
+        crash_detection_info = ""
+        if self.attack_stats["crash_detected"] and self.attack_stats["crash_time"]:
+            crash_detection_info = f"""
+🚨 크래시 감지 정보:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 크래시 발생: 예{'':<50} │
+│ 크래시 시간: {self.attack_stats['crash_time'].strftime('%Y-%m-%d %H:%M:%S'):<50} │
+│ 크래시까지 소요: {crash_duration:.1f}분{'':<45} │
+│ 최대 연결 수: {connections_peak}개{'':<45} │
+│ 연결 수 감소율: {((connections_peak - connections_end) / connections_peak * 100):.1f}%{'':<40} │
+└─────────────────────────────────────────────────────────────────────────────┘
+"""
+        else:
+            crash_detection_info = f"""
+✅ 크래시 미발생:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 공격 완료: 정상 종료{'':<45} │
+│ 최대 연결 수: {connections_peak}개{'':<45} │
+│ 최종 연결 수: {connections_end}개{'':<45} │
+└─────────────────────────────────────────────────────────────────────────────┘
+"""
         
         report = f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                        DoS 공격 통합 분석 보고서                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
+{crash_detection_info}
 
 📊 공격 개요:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 시작 시간: {self.attack_stats['start_time'].strftime('%Y-%m-%d %H:%M:%S') if self.attack_stats['start_time'] else 'N/A':<50} │
 │ 종료 시간: {self.attack_stats['end_time'].strftime('%Y-%m-%d %H:%M:%S') if self.attack_stats['end_time'] else 'N/A':<50} │
 │ 총 지속 시간: {duration:.1f}분{'':<45} │
-│ 데이터 포인트: {self.monitor.stats['total_data_points']}개{'':<45} │
+│ 데이터 포인트: {len(memory_data)}개{'':<45} │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 🚨 크래시 분석:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 크래시 발생: {'예' if self.attack_stats['crash_detected'] else '아니오':<50} │
 │ 크래시 시간: {self.attack_stats['crash_time'].strftime('%Y-%m-%d %H:%M:%S') if self.attack_stats['crash_time'] else 'N/A':<50} │
-│ 크래시까지 소요: {f'{crash_time_minutes:.1f}분' if crash_time_minutes else 'N/A':<50} │
+│ 크래시까지 소요: {f"{crash_duration:.1f}분" if crash_duration > 0 else 'N/A'}{'':<45} │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-💾 메모리 분석:
+💾 메모리 분석 (크래시까지):
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 초기 메모리 사용률: {memory_start:.1f}%{'':<40} │
 │ 최종 메모리 사용률: {memory_end:.1f}%{'':<40} │
@@ -362,7 +456,7 @@ class IntegratedDoSAnalyzer:
 │ 메모리 증가율: {f"{((memory_end - memory_start) / duration):.2f}% per minute" if duration > 0 else 'N/A'}{'':<25} │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-🔗 네트워크 연결 분석:
+🔗 네트워크 연결 분석 (크래시까지):
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 초기 연결 수: {connections_start}개{'':<40} │
 │ 최종 연결 수: {connections_end}개{'':<40} │
@@ -372,12 +466,12 @@ class IntegratedDoSAnalyzer:
 │ 연결 증가율: {f"{((connections_end - connections_start) / duration):.1f} connections per minute" if duration > 0 else 'N/A'}{'':<15} │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-📈 시간별 분석:
+📈 시간별 분석 (크래시까지):
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ CPU 평균 사용률: {np.mean(list(self.monitor.cpu_usage)):.1f}%{'':<40} │
-│ CPU 최대 사용률: {max(list(self.monitor.cpu_usage)):.1f}%{'':<40} │
-│ 프로세스 평균 수: {np.mean(list(self.monitor.process_count)):.0f}개{'':<40} │
-│ 프로세스 최대 수: {max(list(self.monitor.process_count))}개{'':<40} │
+│ CPU 평균 사용률: {np.mean(cpu_data):.1f}%{'':<40} │
+│ CPU 최대 사용률: {max(cpu_data):.1f}%{'':<40} │
+│ 프로세스 평균 수: {np.mean(process_data):.0f}개{'':<40} │
+│ 프로세스 최대 수: {max(process_data)}개{'':<40} │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ⚠️  크래시 임계점 분석:
@@ -390,7 +484,7 @@ class IntegratedDoSAnalyzer:
 🎯 결론 및 권장사항:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 1. 크래시 발생 여부: {'크래시 발생' if self.attack_stats['crash_detected'] else '크래시 미발생'}{'':<35} │
-│ 2. 주요 원인: {'메모리 부족' if memory_peak >= 95 else '리소스 과부하'}{'':<40} │
+│ 2. 주요 원인: {'메모리 부족' if memory_peak >= 95 else '연결 수 급감' if self.attack_stats['crash_detected'] else '리소스 과부하'}{'':<40} │
 │ 3. 권장 대응: {'즉시 공격 중지 및 메모리 정리' if self.attack_stats['crash_detected'] else '모니터링 지속'}{'':<25} │
 │ 4. 예방 조치: {'메모리 제한 설정 및 연결 수 제한' if self.attack_stats['crash_detected'] else '정상 범위 내 운영'}{'':<25} │
 └─────────────────────────────────────────────────────────────────────────────┘
