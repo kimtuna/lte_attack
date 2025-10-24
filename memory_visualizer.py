@@ -69,31 +69,31 @@ class MemoryVisualizer:
         
         # 경영진용 요약 차트
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
-        fig.suptitle('DoS 공격 영향 분석 - 경영진 보고서', fontsize=20, fontweight='bold', y=0.95)
+        fig.suptitle('DoS Attack Impact Analysis - Executive Report', fontsize=20, fontweight='bold', y=0.95)
         
         # 1. 메모리 사용률 (메인 차트)
-        ax1.plot(minutes, memory_usage, 'b-', linewidth=4, label='메모리 사용률')
-        ax1.axhline(y=95, color='red', linestyle='--', linewidth=3, alpha=0.8, label='크래시 임계점')
-        ax1.axhline(y=80, color='orange', linestyle='--', linewidth=2, alpha=0.7, label='경고 임계점')
+        ax1.plot(minutes, memory_usage, 'b-', linewidth=4, label='Memory Usage')
+        ax1.axhline(y=95, color='red', linestyle='--', linewidth=3, alpha=0.8, label='Crash Threshold')
+        ax1.axhline(y=80, color='orange', linestyle='--', linewidth=2, alpha=0.7, label='Warning Threshold')
         
         if crash_minutes:
             ax1.axvline(x=crash_minutes, color='red', linestyle=':', linewidth=4, alpha=0.9, 
-                       label=f'크래시 발생 ({crash_minutes:.1f}분)')
+                       label=f'Crash Detected ({crash_minutes:.1f}min)')
         
-        ax1.set_title('시스템 메모리 사용률', fontsize=16, fontweight='bold')
-        ax1.set_xlabel('시간 (분)', fontsize=14)
-        ax1.set_ylabel('메모리 사용률 (%)', fontsize=14)
+        ax1.set_title('System Memory Usage', fontsize=16, fontweight='bold')
+        ax1.set_xlabel('Time (minutes)', fontsize=14)
+        ax1.set_ylabel('Memory Usage (%)', fontsize=14)
         ax1.legend(fontsize=12)
         ax1.grid(True, alpha=0.3)
         ax1.set_ylim(0, 100)
         
         # 2. 네트워크 연결 수
-        ax2.plot(minutes, connections, 'g-', linewidth=3, label='네트워크 연결 수')
+        ax2.plot(minutes, connections, 'g-', linewidth=3, label='Network Connections')
         if crash_minutes:
             ax2.axvline(x=crash_minutes, color='red', linestyle=':', linewidth=3, alpha=0.8)
-        ax2.set_title('네트워크 연결 수 변화', fontsize=16, fontweight='bold')
-        ax2.set_xlabel('시간 (분)', fontsize=14)
-        ax2.set_ylabel('연결 수', fontsize=14)
+        ax2.set_title('Network Connections Change', fontsize=16, fontweight='bold')
+        ax2.set_xlabel('Time (minutes)', fontsize=14)
+        ax2.set_ylabel('Connections', fontsize=14)
         ax2.legend(fontsize=12)
         ax2.grid(True, alpha=0.3)
         
@@ -102,16 +102,16 @@ class MemoryVisualizer:
         peak_connections = stats.get("peak_connections", 0)
         crash_detected = bool(crash_time_str)
         
-        metrics = ['메모리 사용률', '네트워크 연결', '크래시 발생']
-        values = [f'{peak_memory:.1f}%', f'{peak_connections}개', '예' if crash_detected else '아니오']
+        metrics = ['Memory Usage', 'Network Connections', 'Crash Detected']
+        values = [f'{peak_memory:.1f}%', f'{peak_connections}', 'Yes' if crash_detected else 'No']
         colors = ['red' if peak_memory >= 95 else 'orange' if peak_memory >= 80 else 'green',
                  'red' if peak_connections > 1000 else 'orange' if peak_connections > 500 else 'green',
                  'red' if crash_detected else 'green']
         
         bars = ax3.bar(metrics, [peak_memory, min(peak_connections/10, 100), 100 if crash_detected else 0], 
                       color=colors, alpha=0.7)
-        ax3.set_title('핵심 지표 요약', fontsize=16, fontweight='bold')
-        ax3.set_ylabel('값', fontsize=14)
+        ax3.set_title('Key Metrics Summary', fontsize=16, fontweight='bold')
+        ax3.set_ylabel('Value', fontsize=14)
         ax3.set_ylim(0, 100)
         
         # 값 표시
@@ -133,13 +133,13 @@ class MemoryVisualizer:
                 risk_levels.append(0)  # 정상
         
         risk_colors = ['green', 'yellow', 'orange', 'red']
-        risk_labels = ['정상', '낮음', '중간', '높음']
+        risk_labels = ['Normal', 'Low', 'Medium', 'High']
         
         ax4.fill_between(minutes, risk_levels, alpha=0.6, color='red')
         ax4.plot(minutes, risk_levels, 'k-', linewidth=2)
-        ax4.set_title('시간별 위험도 분석', fontsize=16, fontweight='bold')
-        ax4.set_xlabel('시간 (분)', fontsize=14)
-        ax4.set_ylabel('위험도', fontsize=14)
+        ax4.set_title('Risk Level Over Time', fontsize=16, fontweight='bold')
+        ax4.set_xlabel('Time (minutes)', fontsize=14)
+        ax4.set_ylabel('Risk Level', fontsize=14)
         ax4.set_ylim(0, 3)
         ax4.set_yticks([0, 1, 2, 3])
         ax4.set_yticklabels(risk_labels)
@@ -178,54 +178,54 @@ class MemoryVisualizer:
         
         # 기술진용 상세 차트
         fig, axes = plt.subplots(2, 3, figsize=(20, 12))
-        fig.suptitle('DoS 공격 기술적 분석 - 상세 보고서', fontsize=20, fontweight='bold')
+        fig.suptitle('DoS Attack Technical Analysis - Detailed Report', fontsize=20, fontweight='bold')
         
         # 1. 메모리 사용률 (상세)
-        axes[0, 0].plot(minutes, memory_usage, 'b-', linewidth=2, label='메모리 사용률')
-        axes[0, 0].axhline(y=95, color='red', linestyle='--', alpha=0.8, label='크래시 임계점 (95%)')
-        axes[0, 0].axhline(y=80, color='orange', linestyle='--', alpha=0.7, label='경고 임계점 (80%)')
-        axes[0, 0].axhline(y=60, color='yellow', linestyle='--', alpha=0.6, label='주의 임계점 (60%)')
-        axes[0, 0].set_title('메모리 사용률 변화', fontweight='bold')
-        axes[0, 0].set_xlabel('시간 (분)')
-        axes[0, 0].set_ylabel('메모리 사용률 (%)')
+        axes[0, 0].plot(minutes, memory_usage, 'b-', linewidth=2, label='Memory Usage')
+        axes[0, 0].axhline(y=95, color='red', linestyle='--', alpha=0.8, label='Crash Threshold (95%)')
+        axes[0, 0].axhline(y=80, color='orange', linestyle='--', alpha=0.7, label='Warning Threshold (80%)')
+        axes[0, 0].axhline(y=60, color='yellow', linestyle='--', alpha=0.6, label='Caution Threshold (60%)')
+        axes[0, 0].set_title('Memory Usage Change', fontweight='bold')
+        axes[0, 0].set_xlabel('Time (minutes)')
+        axes[0, 0].set_ylabel('Memory Usage (%)')
         axes[0, 0].legend()
         axes[0, 0].grid(True, alpha=0.3)
         axes[0, 0].set_ylim(0, 100)
         
         # 2. CPU 사용률
-        axes[0, 1].plot(minutes, cpu_usage, 'purple', linewidth=2, label='CPU 사용률')
-        axes[0, 1].set_title('CPU 사용률 변화', fontweight='bold')
-        axes[0, 1].set_xlabel('시간 (분)')
-        axes[0, 1].set_ylabel('CPU 사용률 (%)')
+        axes[0, 1].plot(minutes, cpu_usage, 'purple', linewidth=2, label='CPU Usage')
+        axes[0, 1].set_title('CPU Usage Change', fontweight='bold')
+        axes[0, 1].set_xlabel('Time (minutes)')
+        axes[0, 1].set_ylabel('CPU Usage (%)')
         axes[0, 1].legend()
         axes[0, 1].grid(True, alpha=0.3)
         axes[0, 1].set_ylim(0, 100)
         
         # 3. 네트워크 연결 수
-        axes[0, 2].plot(minutes, connections, 'g-', linewidth=2, label='네트워크 연결 수')
-        axes[0, 2].set_title('네트워크 연결 수 변화', fontweight='bold')
-        axes[0, 2].set_xlabel('시간 (분)')
-        axes[0, 2].set_ylabel('연결 수')
+        axes[0, 2].plot(minutes, connections, 'g-', linewidth=2, label='Network Connections')
+        axes[0, 2].set_title('Network Connections Change', fontweight='bold')
+        axes[0, 2].set_xlabel('Time (minutes)')
+        axes[0, 2].set_ylabel('Connections')
         axes[0, 2].legend()
         axes[0, 2].grid(True, alpha=0.3)
         
         # 4. 프로세스 수
-        axes[1, 0].plot(minutes, process_count, 'orange', linewidth=2, label='프로세스 수')
-        axes[1, 0].set_title('프로세스 수 변화', fontweight='bold')
-        axes[1, 0].set_xlabel('시간 (분)')
-        axes[1, 0].set_ylabel('프로세스 수')
+        axes[1, 0].plot(minutes, process_count, 'orange', linewidth=2, label='Process Count')
+        axes[1, 0].set_title('Process Count Change', fontweight='bold')
+        axes[1, 0].set_xlabel('Time (minutes)')
+        axes[1, 0].set_ylabel('Process Count')
         axes[1, 0].legend()
         axes[1, 0].grid(True, alpha=0.3)
         
         # 5. 메모리 사용률 히스토그램
         axes[1, 1].hist(memory_usage, bins=20, alpha=0.7, color='blue', edgecolor='black')
         axes[1, 1].axvline(np.mean(memory_usage), color='red', linestyle='--', linewidth=2, 
-                          label=f'평균: {np.mean(memory_usage):.1f}%')
+                          label=f'Mean: {np.mean(memory_usage):.1f}%')
         axes[1, 1].axvline(np.median(memory_usage), color='green', linestyle='--', linewidth=2, 
-                          label=f'중앙값: {np.median(memory_usage):.1f}%')
-        axes[1, 1].set_title('메모리 사용률 분포', fontweight='bold')
-        axes[1, 1].set_xlabel('메모리 사용률 (%)')
-        axes[1, 1].set_ylabel('빈도')
+                          label=f'Median: {np.median(memory_usage):.1f}%')
+        axes[1, 1].set_title('Memory Usage Distribution', fontweight='bold')
+        axes[1, 1].set_xlabel('Memory Usage (%)')
+        axes[1, 1].set_ylabel('Frequency')
         axes[1, 1].legend()
         axes[1, 1].grid(True, alpha=0.3)
         
@@ -239,7 +239,7 @@ class MemoryVisualizer:
         
         correlation_matrix = correlation_data.corr()
         im = axes[1, 2].imshow(correlation_matrix, cmap='coolwarm', aspect='auto')
-        axes[1, 2].set_title('리소스 상관관계 매트릭스', fontweight='bold')
+        axes[1, 2].set_title('Resource Correlation Matrix', fontweight='bold')
         
         # 상관관계 값 표시
         for i in range(len(correlation_matrix.columns)):
@@ -281,28 +281,28 @@ class MemoryVisualizer:
         fig, ax = plt.subplots(figsize=(16, 8))
         
         # 메모리 사용률 플롯
-        ax.plot(timestamps, memory_usage, 'b-', linewidth=3, label='메모리 사용률')
+        ax.plot(timestamps, memory_usage, 'b-', linewidth=3, label='Memory Usage')
         
         # 임계점 라인
-        ax.axhline(y=95, color='red', linestyle='--', linewidth=2, alpha=0.8, label='크래시 임계점 (95%)')
-        ax.axhline(y=80, color='orange', linestyle='--', linewidth=2, alpha=0.7, label='경고 임계점 (80%)')
-        ax.axhline(y=60, color='yellow', linestyle='--', linewidth=2, alpha=0.6, label='주의 임계점 (60%)')
+        ax.axhline(y=95, color='red', linestyle='--', linewidth=2, alpha=0.8, label='Crash Threshold (95%)')
+        ax.axhline(y=80, color='orange', linestyle='--', linewidth=2, alpha=0.7, label='Warning Threshold (80%)')
+        ax.axhline(y=60, color='yellow', linestyle='--', linewidth=2, alpha=0.6, label='Caution Threshold (60%)')
         
         # 크래시 시점 표시
         crash_time_str = stats.get("crash_time")
         if crash_time_str:
             crash_time = datetime.fromisoformat(crash_time_str)
             ax.axvline(x=crash_time, color='red', linestyle=':', linewidth=4, alpha=0.9, 
-                      label=f'크래시 발생 ({crash_time.strftime("%H:%M:%S")})')
+                      label=f'Crash Detected ({crash_time.strftime("%H:%M:%S")})')
         
         # 시간 축 포맷팅
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
         ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=1))
         plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
         
-        ax.set_title('DoS 공격 타임라인 - 메모리 사용률 변화', fontsize=18, fontweight='bold')
-        ax.set_xlabel('시간', fontsize=14)
-        ax.set_ylabel('메모리 사용률 (%)', fontsize=14)
+        ax.set_title('DoS Attack Timeline - Memory Usage Change', fontsize=18, fontweight='bold')
+        ax.set_xlabel('Time', fontsize=14)
+        ax.set_ylabel('Memory Usage (%)', fontsize=14)
         ax.legend(fontsize=12)
         ax.grid(True, alpha=0.3)
         ax.set_ylim(0, 100)
