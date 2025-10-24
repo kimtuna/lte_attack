@@ -392,30 +392,26 @@ class MemoryVisualizer:
         
         print("=== 프레젠테이션 자료 생성 시작 ===")
         
-        # 1. 경영진용 요약 차트
-        print("1. 경영진용 요약 차트 생성 중...")
-        self.create_executive_summary_chart()
+        # 기존 파일 삭제
+        import os
+        files_to_remove = [
+            f"{self.output_dir}/executive_summary_chart.png",
+            f"{self.output_dir}/timeline_chart.png",
+            f"{self.output_dir}/presentation_summary.txt"
+        ]
+        for file in files_to_remove:
+            if os.path.exists(file):
+                os.remove(file)
+                print(f"기존 파일 삭제: {file}")
         
-        # 2. 타임라인 차트
-        print("2. 타임라인 차트 생성 중...")
-        self.create_timeline_chart()
-        
-        # 3. 요약 보고서 생성
-        print("3. 요약 보고서 생성 중...")
-        summary = self.generate_presentation_summary()
-        
-        # 요약 보고서 저장
-        summary_filename = f"{self.output_dir}/presentation_summary.txt"
-        with open(summary_filename, 'w', encoding='utf-8') as f:
-            f.write(summary)
-        print(f"프레젠테이션 요약 저장: {summary_filename}")
+        # 기술진용 상세 분석 차트만 생성
+        print("기술진용 상세 분석 차트 생성 중...")
+        self.create_technical_analysis_chart()
         
         print("\n=== 프레젠테이션 자료 생성 완료 ===")
         print(f"출력 디렉토리: {self.output_dir}/")
-        print("생성된 파일들:")
-        print("- executive_summary_chart.png (경영진용)")
-        print("- timeline_chart.png (타임라인)")
-        print("- presentation_summary.txt (요약)")
+        print("생성된 파일:")
+        print("- technical_analysis_chart.png (기술진용)")
         
         return True
     
