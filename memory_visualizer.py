@@ -456,6 +456,7 @@ class MemoryVisualizer:
 def main():
     """메인 함수"""
     parser = argparse.ArgumentParser(description="메모리 시각화 도구")
+    parser.add_argument("--data", required=True, help="분석 데이터 JSON 파일")
     parser.add_argument("--output-dir", default="memory_charts", help="출력 디렉토리")
     parser.add_argument("--web-server", action="store_true", help="웹 서버 자동 시작")
     parser.add_argument("--port", type=int, default=8080, help="웹 서버 포트")
