@@ -41,7 +41,7 @@ class MemoryVisualizer:
             return False
     
     def create_executive_summary_chart(self):
-        """경영진용 요약 차트 생성"""
+        """요약 차트 생성"""
         if not self.data:
             return None
         
@@ -67,7 +67,7 @@ class MemoryVisualizer:
             crash_time = datetime.fromisoformat(crash_time_str)
             crash_minutes = (crash_time - start_time).total_seconds() / 60
         
-        # 경영진용 요약 차트
+        # 요약 차트
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
         fig.suptitle('DoS Attack Impact Analysis - Executive Report', fontsize=20, fontweight='bold', y=0.95)
         
@@ -396,16 +396,12 @@ class MemoryVisualizer:
         print("1. 경영진용 요약 차트 생성 중...")
         self.create_executive_summary_chart()
         
-        # 2. 기술진용 상세 분석 차트
-        print("2. 기술진용 상세 분석 차트 생성 중...")
-        self.create_technical_analysis_chart()
-        
-        # 3. 타임라인 차트
-        print("3. 타임라인 차트 생성 중...")
+        # 2. 타임라인 차트
+        print("2. 타임라인 차트 생성 중...")
         self.create_timeline_chart()
         
-        # 4. 요약 보고서 생성
-        print("4. 요약 보고서 생성 중...")
+        # 3. 요약 보고서 생성
+        print("3. 요약 보고서 생성 중...")
         summary = self.generate_presentation_summary()
         
         # 요약 보고서 저장
@@ -418,7 +414,6 @@ class MemoryVisualizer:
         print(f"출력 디렉토리: {self.output_dir}/")
         print("생성된 파일들:")
         print("- executive_summary_chart.png (경영진용)")
-        print("- technical_analysis_chart.png (기술진용)")
         print("- timeline_chart.png (타임라인)")
         print("- presentation_summary.txt (요약)")
         
